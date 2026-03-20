@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — Cubicle</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+
+      --accent: #7df0ff;
+      --accent2: #ff6ec7;
+      --accent-rgb: 125 240 255;
+      --accent2-rgb: 255 110 199;
+
+      --spot-x: 50%;
+      --spot-y: 35%;
+      --spot-alpha: 0.14;
+      --hot: 125 240 255;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.02) contrast(1.02);
+    }
+
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.32));
+      pointer-events: none;
+    }
+
+    .spot {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x) var(--spot-y),
+          rgb(var(--accent-rgb) / var(--spot-alpha)),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: calc(0.95 * var(--spot-ready, 0));
+    }
+    body.in-shell .spot { opacity: 0 !important; }
+
+    .rain {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rain { display: none; }
+    }
+
+    .hotspots {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .hotspots a { cursor: pointer; }
+    .hotspots rect {
+      fill: rgb(var(--hot) / 0.02);
+      stroke: transparent;
+      stroke-width: 6px;
+      vector-effect: non-scaling-stroke;
+    }
+    .hotspots a:hover rect {
+      fill: rgb(var(--hot) / 0.07);
+      stroke: transparent;
+    }
+    .hotspots a:focus-visible rect {
+      fill: rgb(var(--hot) / 0.10);
+      stroke: rgb(var(--hot) / 0.90);
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    body:not(.in-shell) .standalone-exit {
+      display: inline-block;
+    }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+    .standalone-exit:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.45);
+      outline-offset: 3px;
+    }
+
+    /* ---- Overlay (pseudo-OS) ---- */
+    .os-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    .os-overlay.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .os-overlay__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgb(0 0 0 / 0.58);
+      backdrop-filter: blur(6px);
+    }
+    .os-overlay__panel {
+      position: relative;
+      width: min(1280px, calc(100vw - 2rem));
+      height: min(720px, calc(100vh - 2rem));
+      border-radius: 18px;
+      border: 1px solid rgba(232, 238, 246, 0.18);
+      background: rgb(9 14 20 / 0.72);
+      box-shadow:
+        0 24px 90px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(125, 240, 255, 0.07) inset;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+    .os-overlay__topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid rgba(232, 238, 246, 0.10);
+      background:
+        linear-gradient(180deg, rgb(12 18 26 / 0.78), rgb(12 18 26 / 0.45));
+    }
+    .os-overlay__brand {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-weight: 650;
+      letter-spacing: 0.2px;
+      color: var(--text-muted);
+    }
+    .os-overlay__brand__dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgb(var(--accent-rgb) / 1);
+      box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.12);
+    }
+    .os-overlay__actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .os-overlay__applabel {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+    /* Hidden until we have more than one app */
+    .os-overlay__applabel { display: none; }
+    .os-overlay__select {
+      appearance: none;
+      background: rgb(9 14 20 / 0.4);
+      border: 1px solid rgba(232, 238, 246, 0.20);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 0.55rem 2.0rem 0.55rem 0.75rem;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    .os-overlay__close {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      border: 1px solid rgba(232, 238, 246, 0.18);
+      background: rgb(9 14 20 / 0.45);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.15s ease;
+    }
+    .os-overlay__close:hover { transform: translateY(-1px); border-color: rgba(125, 240, 255, 0.4); }
+    .os-overlay__close:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.35);
+      outline-offset: 3px;
+    }
+    .os-overlay__body {
+      overflow: auto;
+      scrollbar-gutter: stable both-edges;
+      padding: 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .os-overlay__footer {
+      border-top: 1px solid rgba(232, 238, 246, 0.10);
+      background: linear-gradient(180deg, rgb(12 18 26 / 0.35), rgb(12 18 26 / 0.62));
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+    .os-overlay__footer .row { justify-content: center; }
+
+    .app { display: block; width: 100%; max-width: 600px; }
+    .app__title { margin: 0 0 0.1rem; font-size: 1.3rem; }
+    .app__subtitle { margin: 0 0 1rem; color: var(--text-muted); max-width: 62ch; }
+
+    /* ---- App: decompose ---- */
+    .decompose {
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      text-align: center;
+      gap: 0.85rem;
+    }
+    .decompose__title {
+      margin: 0;
+      font-size: 1.45rem;
+      font-weight: 680;
+      letter-spacing: 0.2px;
+    }
+    .decompose__view {
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.85rem;
+      padding-top: 0.25rem;
+    }
+    .decompose__card {
+      width: 100%;
+      min-width: min(600px, 100%);
+      border-radius: 16px;
+      border: 1px solid rgba(232, 238, 246, 0.14);
+      background: rgb(9 14 20 / 0.22);
+      padding: 0.85rem;
+    }
+    .decompose__prompt {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 620;
+      letter-spacing: 0.1px;
+    }
+    .decompose__task {
+      margin: 0.35rem 0 0;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .decompose__timer {
+      font-variant-numeric: tabular-nums;
+      font-size: 2.1rem;
+      font-weight: 720;
+      letter-spacing: 0.5px;
+      margin: 0.2rem 0 0;
+    }
+    .decompose__lists {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      text-align: left;
+      width: 100%;
+    }
+    @media (max-width: 820px) {
+      .decompose__lists { grid-template-columns: 1fr; }
+    }
+    .decompose__h {
+      margin: 0 0 0.45rem;
+      font-size: 0.92rem;
+      font-weight: 650;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .decompose__ul {
+      margin: 0;
+      padding: 0 0 0 1.1rem;
+      color: rgba(232, 238, 246, 0.88);
+    }
+    .decompose__ul li { margin: 0.25rem 0; }
+    .decompose__meta {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      margin: 0.35rem 0 0;
+    }
+
+    .app__grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+    .app__grid--single .app__col { max-width: 680px; margin: 0 auto; }
+    @media (max-width: 900px) {
+      .app__grid { grid-template-columns: 1fr; }
+    }
+
+    .field__label { display: block; color: var(--text-muted); margin-bottom: 0.35rem; font-size: 0.88rem; }
+    .field__textarea {
+      width: 100%;
+      min-width: min(560px, 100%);
+      resize: vertical;
+      min-height: 6.5rem;
+      border-radius: 14px;
+      border: 1px solid rgba(232, 238, 246, 0.18);
+      background: rgb(9 14 20 / 0.35);
+      color: var(--text);
+      padding: 0.75rem 0.85rem;
+      outline: none;
+      font-family: inherit;
+      line-height: 1.35;
+    }
+
+    .row { display: flex; gap: 0.55rem; align-items: center; flex-wrap: wrap; }
+    .row--space { justify-content: space-between; }
+    .row--space span { font-weight: 600; }
+
+    .btn {
+      border-radius: 12px;
+      border: 1px solid rgba(232, 238, 246, 0.18);
+      background: rgba(9, 14, 20, 0.28);
+      color: var(--text);
+      padding: 0.75rem 1.0rem;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+      font-weight: 600;
+      min-height: 44px;
+      letter-spacing: 0.01em;
+    }
+    .btn:hover { border-color: rgba(125, 240, 255, 0.5); background: rgba(125, 240, 255, 0.06); transform: translateY(-1px); }
+    .btn:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.35);
+      outline-offset: 3px;
+    }
+    .btn--primary {
+      border-color: rgb(var(--accent-rgb) / 0.35);
+      background: rgba(125, 240, 255, 0.08);
+    }
+    .btn--ghost {
+      background: transparent;
+      border-color: rgba(232, 238, 246, 0.16);
+      color: var(--text-muted);
+    }
+    .btn--small { padding: 0.60rem 0.75rem; font-size: 0.92rem; min-height: 40px; }
+
+    .hint {
+      margin-top: 0.75rem;
+      padding: 0.65rem 0.75rem;
+      border-radius: 14px;
+      border: 1px solid rgba(232, 238, 246, 0.12);
+      color: var(--text-muted);
+      background: rgb(9 14 20 / 0.22);
+      line-height: 1.35;
+      font-size: 0.92rem;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <script>if (window.self !== window.top) document.body.classList.add('in-shell');</script>
+  <main class="scene">
+    <img
+      class="bg"
+      src="../pics/cubicle-monitor.jpg"
+      alt="Futuristic cubicle interior with neon displays and holographic interface."
+    >
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot" aria-hidden="true"></div>
+
+    <svg class="hotspots" viewBox="0 0 1376 768" preserveAspectRatio="xMidYMid slice" aria-label="Cubicle hotspots">
+      <!-- Click target: computer (hotspot over the monitor area) -->
+      <a href="#" data-hotspot="os" aria-label="Open computer overlay">
+        <!-- Tuned for the monitor in cubicle-monitor.jpg; adjust if needed -->
+        <rect x="380" y="300" width="380" height="260" rx="12" ry="12"></rect>
+      </a>
+
+      <!-- Back navigation hotspot (top screens) -->
+      <a href="map.html" aria-label="Map">
+        <rect x="0" y="0" width="1376" height="200" rx="14" ry="14"></rect>
+      </a>
+    </svg>
+
+    <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+  </main>
+
+  <!-- Overlay "pseudo-OS" -->
+  <div
+    id="osOverlay"
+    class="os-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Computer overlay"
+    aria-hidden="true"
+  >
+    <div class="os-overlay__backdrop" data-close="true" aria-hidden="true"></div>
+    <div class="os-overlay__panel" role="document">
+      <div class="os-overlay__topbar">
+        <div class="os-overlay__brand">
+          <span class="os-overlay__brand__text">Cubicle OS</span>
+        </div>
+
+        <div class="os-overlay__actions">
+          <label class="os-overlay__applabel">
+            <span class="os-overlay__applabel__text">App</span>
+            <select id="osAppSelect" class="os-overlay__select" aria-label="Select application">
+              <option value="decompose" selected>decompose</option>
+            </select>
+          </label>
+          <button type="button" class="os-overlay__close" data-close="true" aria-label="Close overlay">✕</button>
+        </div>
+      </div>
+
+      <div class="os-overlay__body">
+        <section id="app-decompose" class="app" aria-label="decompose app">
+          <div class="decompose">
+            <p class="decompose__title">Let's work</p>
+            <div class="decompose__view" id="decomposeView" aria-live="polite"></div>
+          </div>
+        </section>
+      </div>
+      <div class="os-overlay__footer">
+        <div class="row">
+          <button type="button" class="btn btn--ghost btn--small" id="decomposeWorkBtn">Work</button>
+          <button type="button" class="btn btn--ghost btn--small" id="decomposeTasksBtn">Tasks</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var overlay = document.getElementById('osOverlay');
+      var select = document.getElementById('osAppSelect');
+
+      var currentApp = 'decompose';
+
+      function openOverlay() {
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('os-open');
+        // Focus first control for accessibility.
+        var closeBtn = overlay.querySelector('[data-close="true"]');
+        if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+      }
+
+      function closeOverlay() {
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('os-open');
+      }
+
+      var closeBtnEl = overlay.querySelector('.os-overlay__close[data-close="true"]');
+      var backdropEl = overlay.querySelector('.os-overlay__backdrop[data-close="true"]');
+
+      // Hotspot click.
+      var osHotspotLink = document.querySelector('[data-hotspot="os"]');
+      if (osHotspotLink) {
+        osHotspotLink.addEventListener('click', function (e) {
+          e.preventDefault();
+          openOverlay();
+        });
+      }
+
+      if (closeBtnEl) {
+        closeBtnEl.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeOverlay();
+        });
+      }
+
+      // Close by clicking backdrop / close button.
+      overlay.addEventListener('click', function (e) {
+        var t = e.target;
+        // Rooftop-like approach: close only for backdrop/overlay click.
+        if (backdropEl && t === backdropEl) return closeOverlay();
+        if (t && t === overlay) return closeOverlay();
+      });
+
+      // Close on Escape.
+      window.addEventListener('keydown', function (e) {
+        if (!overlay || !overlay.classList.contains('is-open')) return;
+        if (e.key === 'Escape') closeOverlay();
+      });
+
+      // App switching (future-proof).
+      if (select) {
+        select.addEventListener('change', function () {
+          currentApp = select.value;
+          var apps = overlay.querySelectorAll('.app');
+          apps.forEach(function (a) { a.hidden = true; });
+          var active = overlay.querySelector('#app-' + currentApp);
+          if (active) active.hidden = false;
+        });
+      }
+    })();
+
+    (function () {
+      var LS_KEY = 'city.decompose.v1';
+      var TEN_MIN_MS = 10 * 60 * 1000;
+
+      var viewEl = document.getElementById('decomposeView');
+      var workBtn = document.getElementById('decomposeWorkBtn');
+      var tasksBtn = document.getElementById('decomposeTasksBtn');
+
+      if (!viewEl || !tasksBtn || !workBtn) return;
+
+      var tickTimer = 0;
+
+      function now() { return Date.now(); }
+      function uid() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+        return 'id_' + Math.random().toString(16).slice(2) + '_' + now().toString(16);
+      }
+
+      function safeParse(json, fallback) {
+        try { return JSON.parse(json); } catch (e) { return fallback; }
+      }
+
+      function load() {
+        var raw = localStorage.getItem(LS_KEY);
+        var s = safeParse(raw, null);
+        if (!s || typeof s !== 'object') {
+          return {
+            nodes: {},
+            children: {},
+            roots: [],
+            workList: [],
+            attempts: {},
+            spentMs: {},
+            completed: [],
+            currentId: null,
+            activeTimer: null,
+            view: 'work'
+          };
+        }
+        // Normalize minimal shape for future changes.
+        s.nodes = s.nodes || {};
+        s.children = s.children || {};
+        s.roots = s.roots || [];
+        s.workList = s.workList || [];
+        s.attempts = s.attempts || {};
+        s.spentMs = s.spentMs || {};
+        s.completed = s.completed || [];
+        if (!s.view) s.view = 'work';
+        return s;
+      }
+
+      function save(state) {
+        localStorage.setItem(LS_KEY, JSON.stringify(state));
+      }
+
+      function getNode(state, id) {
+        return id ? state.nodes[id] : null;
+      }
+
+      function isCompleted(state, id) {
+        for (var i = 0; i < state.completed.length; i++) {
+          if (state.completed[i].id === id) return true;
+        }
+        return false;
+      }
+
+      function cleanLines(text) {
+        return String(text || '')
+          .split('\n')
+          .map(function (s) { return s.trim(); })
+          .filter(Boolean);
+      }
+
+      function startTimer(state, nodeId, attempt) {
+        var a = attempt || ((state.attempts[nodeId] || 0) + 1);
+        state.activeTimer = { nodeId: nodeId, attempt: a, endsAt: now() + TEN_MIN_MS, startedAt: now() };
+        save(state);
+      }
+
+      function stopTick() {
+        if (tickTimer) window.clearInterval(tickTimer);
+        tickTimer = 0;
+      }
+
+      function ensureTick() {
+        if (tickTimer) return;
+        tickTimer = window.setInterval(function () {
+          var state = load();
+          if (state.view !== 'work' || !state.activeTimer) return;
+          render(state);
+        }, 250);
+      }
+
+      function replaceInWorkList(state, targetId, replacementIds) {
+        var idx = state.workList.indexOf(targetId);
+        if (idx === -1) return;
+        state.workList.splice.apply(state.workList, [idx, 1].concat(replacementIds));
+      }
+
+      function advanceIfCurrentDone(state) {
+        while (state.workList.length && isCompleted(state, state.workList[0])) {
+          state.workList.shift();
+        }
+        state.currentId = state.workList.length ? state.workList[0] : null;
+      }
+
+      function resetAll() {
+        localStorage.removeItem(LS_KEY);
+        stopTick();
+        render(load());
+      }
+
+      function renderWorkInput(state, opts) {
+        var title = opts && opts.title ? opts.title : 'Enter task(s)';
+        var placeholder = opts && opts.placeholder ? opts.placeholder : 'One task per line';
+        var action = opts && opts.action ? opts.action : 'save-root';
+        var btn = opts && opts.button ? opts.button : 'Save';
+        var meta = opts && opts.meta ? opts.meta : '';
+
+        viewEl.innerHTML = ''
+          + '<div class="decompose__card">'
+          +   (meta ? '<p class="decompose__task">' + meta + '</p>' : '')
+          +   '<div style="margin-top:0.65rem; text-align:left;">'
+          +     '<textarea class="field__textarea" id="decomposeInput" placeholder="' + placeholder.replace(/"/g, '&quot;') + '"></textarea>'
+          +     '<div class="row" style="justify-content:center; margin-top:0.65rem;">'
+          +       '<button type="button" class="btn btn--primary" data-action="' + action + '">' + btn + '</button>'
+          +     '</div>'
+          +   '</div>'
+          + '</div>';
+        stopTick();
+      }
+
+      function renderWorkQuestion(state, node) {
+        viewEl.innerHTML = ''
+          + '<div class="decompose__card">'
+          +   '<p class="decompose__prompt">10 min?</p>'
+          +   '<p class="decompose__task">' + escapeHtml(node.text) + '</p>'
+          +   '<div class="row" style="justify-content:center; margin-top:0.75rem;">'
+          +     '<button type="button" class="btn btn--primary" data-action="yes-10">Yes</button>'
+          +     '<button type="button" class="btn" data-action="no-break">No</button>'
+          +   '</div>'
+          + '</div>';
+        stopTick();
+      }
+
+      function renderTimer(state, node, t) {
+        var ms = Math.max(0, (t.endsAt || 0) - now());
+        var totalSec = Math.ceil(ms / 1000);
+        var mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+        var ss = String(totalSec % 60).padStart(2, '0');
+        var attempt = (t.attempt || 1);
+
+        viewEl.innerHTML = ''
+          + '<div class="decompose__card">'
+          +   '<p class="decompose__prompt">' + (attempt > 1 ? ('Attempt ' + attempt) : 'Timer') + '</p>'
+          +   '<p class="decompose__task">' + escapeHtml(node.text) + '</p>'
+          +   '<p class="decompose__timer">' + mm + ':' + ss + '</p>'
+          +   '<div class="row" style="justify-content:center; margin-top:0.75rem;">'
+          +     '<button type="button" class="btn btn--primary" data-action="timer-done">Done</button>'
+          +   '</div>'
+          + '</div>';
+
+        if (ms <= 0) {
+          stopTick();
+          state.activeTimer = { nodeId: t.nodeId, attempt: t.attempt, endsAt: t.endsAt, startedAt: t.startedAt, finished: true };
+          save(state);
+          render(state);
+          return;
+        }
+        ensureTick();
+      }
+
+      function renderDonePrompt(state, node, attempt) {
+        viewEl.innerHTML = ''
+          + '<div class="decompose__card">'
+          +   '<p class="decompose__prompt">Done?</p>'
+          +   '<p class="decompose__task">' + escapeHtml(node.text) + '</p>'
+          +   '<div class="row" style="justify-content:center; margin-top:0.75rem;">'
+          +     '<button type="button" class="btn btn--primary" data-action="done-yes">Yes</button>'
+          +     '<button type="button" class="btn" data-action="done-no">No</button>'
+          +   '</div>'
+          +   '<p class="decompose__meta">Attempts: ' + attempt + '</p>'
+          + '</div>';
+        stopTick();
+      }
+
+      function renderTasks(state) {
+        var currentItems = buildCurrentList(state);
+        var doneItems = (state.completed || []).slice().reverse();
+
+        var currentHtml = currentItems.length
+          ? ('<ul class="decompose__ul">' + currentItems.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>')
+          : '<p class="decompose__meta">—</p>';
+
+        var doneHtml = doneItems.length
+          ? ('<ul class="decompose__ul">' + doneItems.map(function (x) {
+              var a = (x.attempts || 1);
+              var t = (typeof x.durationMs === 'number' && x.durationMs !== null) ? (' · ' + fmtDur(x.durationMs)) : '';
+              return '<li>' + escapeHtml(x.text) + ' <span style="color:rgba(232,238,246,0.55)">(' + a + t + ')</span></li>';
+            }).join('') + '</ul>')
+          : '<p class="decompose__meta">—</p>';
+
+        viewEl.innerHTML = ''
+          + '<div class="decompose__card">'
+          +   '<div class="decompose__lists">'
+          +     '<div>'
+          +       '<p class="decompose__h">Current</p>'
+          +       currentHtml
+          +     '</div>'
+          +     '<div>'
+          +       '<p class="decompose__h">Done</p>'
+          +       doneHtml
+          +     '</div>'
+          +   '</div>'
+          +   '<div class="row" style="justify-content:center; margin-top:0.85rem;">'
+          +     '<button type="button" class="btn" data-action="reset">Reset</button>'
+          +   '</div>'
+          + '</div>';
+        stopTick();
+      }
+
+      function buildCurrentList(state) {
+        // Show workList in order, with current first.
+        var out = [];
+        for (var i = 0; i < state.workList.length; i++) {
+          var id = state.workList[i];
+          if (isCompleted(state, id)) continue;
+          var n = getNode(state, id);
+          if (!n) continue;
+          var prefix = (i === 0 ? '<span style="color:rgb(var(--accent-rgb) / 0.95)">•</span> ' : '');
+          out.push(prefix + escapeHtml(n.text));
+        }
+        return out;
+      }
+
+      function escapeHtml(s) {
+        return String(s || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function fmtDur(ms) {
+        var s = Math.max(0, Math.round(ms / 1000));
+        var m = Math.floor(s / 60);
+        var r = s % 60;
+        return String(m) + ':' + String(r).padStart(2, '0');
+      }
+
+      function render(state) {
+        if (state.view === 'tasks') {
+          renderTasks(state);
+          return;
+        }
+
+        advanceIfCurrentDone(state);
+        save(state);
+
+        if (state.activeTimer && state.activeTimer.nodeId) {
+          var t = state.activeTimer;
+          var node = getNode(state, t.nodeId);
+          if (!node) {
+            state.activeTimer = null;
+            save(state);
+            render(state);
+            return;
+          }
+          if (t.finished || (t.endsAt && now() >= t.endsAt)) {
+            renderDonePrompt(state, node, t.attempt || 1);
+            return;
+          }
+          renderTimer(state, node, t);
+          return;
+        }
+
+        if (!state.workList.length) {
+          renderWorkInput(state, { title: 'Enter task(s)', placeholder: 'One task per line', action: 'save-root', button: 'Save' });
+          return;
+        }
+
+        var currentId = state.workList[0];
+        var current = getNode(state, currentId);
+        if (!current) {
+          state.workList.shift();
+          state.currentId = state.workList[0] || null;
+          save(state);
+          render(state);
+          return;
+        }
+        state.currentId = currentId;
+        save(state);
+        renderWorkQuestion(state, current);
+      }
+
+      function onSaveRoot(state, text) {
+        var lines = cleanLines(text);
+        if (!lines.length) return;
+        var ids = lines.map(function (t) {
+          var id = uid();
+          state.nodes[id] = { id: id, text: t, parentId: null, level: 1, createdAt: now() };
+          state.roots.push(id);
+          return id;
+        });
+        if (!state.workList.length) state.workList = ids.slice();
+        else state.workList = state.workList.concat(ids);
+        state.currentId = state.workList[0] || null;
+        save(state);
+      }
+
+      function onBreakDown(state, parentId, text) {
+        var parent = getNode(state, parentId);
+        if (!parent) return;
+        var lines = cleanLines(text);
+        if (!lines.length) return;
+        var lvl = Math.min(99, (parent.level || 1) + 1);
+        var ids = lines.map(function (t) {
+          var id = uid();
+          state.nodes[id] = { id: id, text: t, parentId: parentId, level: lvl, createdAt: now() };
+          return id;
+        });
+        state.children[parentId] = ids;
+        replaceInWorkList(state, parentId, ids);
+        state.currentId = state.workList[0] || null;
+        save(state);
+      }
+
+      function markDone(state, nodeId, attempt, durationMs) {
+        var node = getNode(state, nodeId);
+        if (!node) return;
+        var finalAttempts = attempt || state.attempts[nodeId] || 1;
+        state.completed.push({
+          id: nodeId,
+          text: node.text,
+          attempts: finalAttempts,
+          durationMs: (typeof durationMs === 'number') ? durationMs : null,
+          completedAt: now(),
+          level: node.level || 1,
+          parentId: node.parentId || null
+        });
+        state.attempts[nodeId] = finalAttempts;
+        if (state.spentMs && typeof state.spentMs === 'object') {
+          delete state.spentMs[nodeId];
+        }
+        // Remove from workList (should be first, but handle any position)
+        var idx = state.workList.indexOf(nodeId);
+        if (idx !== -1) state.workList.splice(idx, 1);
+        state.currentId = state.workList[0] || null;
+        state.activeTimer = null;
+        save(state);
+      }
+
+      // Delegated actions
+      viewEl.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+        if (!btn) return;
+        var action = btn.getAttribute('data-action');
+        var state = load();
+
+        if (action === 'save-root') {
+          var ta0 = document.getElementById('decomposeInput');
+          onSaveRoot(state, ta0 ? ta0.value : '');
+          render(load());
+          return;
+        }
+
+        if (action === 'yes-10') {
+          advanceIfCurrentDone(state);
+          var id = state.workList[0];
+          if (id) startTimer(state, id);
+          render(load());
+          return;
+        }
+
+        if (action === 'no-break') {
+          advanceIfCurrentDone(state);
+          var id2 = state.workList[0];
+          var node2 = getNode(state, id2);
+          if (!node2) { render(load()); return; }
+          // Render breakdown input screen
+          renderWorkInput(state, {
+            title: 'Break down',
+            placeholder: 'One subtask per line',
+            action: 'save-breakdown',
+            button: 'Save',
+            meta: node2.text
+          });
+          // Stash pending parent in memory by saving to state
+          state.pendingBreakdownFor = id2;
+          save(state);
+          return;
+        }
+
+        if (action === 'save-breakdown') {
+          var st = state;
+          var parentId = st.pendingBreakdownFor;
+          var ta = document.getElementById('decomposeInput');
+          onBreakDown(st, parentId, ta ? ta.value : '');
+          st.pendingBreakdownFor = null;
+          save(st);
+          render(load());
+          return;
+        }
+
+        if (action === 'done-yes') {
+          var t = state.activeTimer;
+          if (t && t.nodeId) {
+            var prev = state.spentMs && typeof state.spentMs[t.nodeId] === 'number' ? state.spentMs[t.nodeId] : 0;
+            var total = prev + TEN_MIN_MS;
+            markDone(state, t.nodeId, t.attempt || 1, total);
+          }
+          render(load());
+          return;
+        }
+
+        if (action === 'timer-done') {
+          var t0 = state.activeTimer;
+          if (t0 && t0.nodeId) {
+            var startedAt = (typeof t0.startedAt === 'number') ? t0.startedAt : now();
+            var dur = Math.max(0, now() - startedAt);
+            var prev0 = state.spentMs && typeof state.spentMs[t0.nodeId] === 'number' ? state.spentMs[t0.nodeId] : 0;
+            var total0 = prev0 + dur;
+            markDone(state, t0.nodeId, t0.attempt || 1, total0);
+          }
+          render(load());
+          return;
+        }
+
+        if (action === 'done-no') {
+          var t2 = state.activeTimer;
+          if (t2 && t2.nodeId) {
+            // remember that attempt happened (full 10 min), then restart
+            if (state.spentMs) {
+              state.spentMs[t2.nodeId] = (typeof state.spentMs[t2.nodeId] === 'number' ? state.spentMs[t2.nodeId] : 0) + TEN_MIN_MS;
+            }
+            var nextAttempt = (t2.attempt || 1) + 1;
+            state.activeTimer = null;
+            save(state);
+            var s2 = load();
+            startTimer(s2, t2.nodeId, nextAttempt);
+          }
+          render(load());
+          return;
+        }
+
+        if (action === 'reset') {
+          resetAll();
+          return;
+        }
+      });
+
+      workBtn.addEventListener('click', function () {
+        var state = load();
+        state.view = 'work';
+        save(state);
+        render(load());
+      });
+
+      tasksBtn.addEventListener('click', function () {
+        var state = load();
+        state.view = 'tasks';
+        save(state);
+        render(load());
+      });
+
+      // Initial render (handles reload + persisted timers)
+      render(load());
+    })();
+
+    (function () {
+      var root = document.documentElement;
+      root.dataset.theme = 'dark';
+
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var raf = 0;
+      var lastX = 0;
+      var lastY = 0;
+      function onPointerMove(e) {
+        if (e.pointerType === 'touch') return;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (raf) return;
+        raf = window.requestAnimationFrame(function () {
+          raf = 0;
+          root.style.setProperty('--spot-x', lastX + 'px');
+          root.style.setProperty('--spot-y', lastY + 'px');
+          root.style.setProperty('--spot-ready', '1');
+        });
+      }
+      if (!reduceMotion) {
+        root.style.setProperty('--spot-ready', '0');
+        window.addEventListener('pointermove', onPointerMove, { passive: true });
+      }
+    })();
+  </script>
+
+  <!-- Cubicle is an indoor location: no rain animation. -->
+
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>
+

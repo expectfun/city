@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — Rooftop</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+
+      --accent: #7df0ff;
+      --accent2: #ffc56d;
+      --accent-rgb: 125 240 255;
+      --accent2-rgb: 255 197 109;
+
+      --cyan: #5de8d0;
+      --purple: #c084ff;
+      --danger: #ff5d5d;
+
+      --spot-x: 30%;
+      --spot-y: 35%;
+      --spot-alpha: 0.18;
+      --hot: 0 255 106;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.02) contrast(1.02);
+    }
+
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.32));
+      pointer-events: none;
+    }
+
+    .spot {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x) var(--spot-y),
+          rgb(var(--accent-rgb) / var(--spot-alpha)),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: calc(0.95 * var(--spot-ready, 0));
+    }
+    body.in-shell .spot { opacity: 0 !important; }
+
+    .neon-far {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      opacity: 0.9;
+      filter: saturate(1.12);
+    }
+    .neon-far::before,
+    .neon-far::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(220px 80px at 72% 58%, rgb(var(--accent-rgb) / 0.22), transparent 70%),
+        radial-gradient(180px 70px at 78% 60%, rgb(var(--accent2-rgb) / 0.18), transparent 72%),
+        radial-gradient(240px 90px at 86% 63%, rgb(255 80 120 / 0.16), transparent 72%),
+        linear-gradient(90deg, transparent 0%, rgb(var(--accent-rgb) / 0.10) 38%, rgb(var(--accent2-rgb) / 0.08) 62%, transparent 100%);
+      transform: translate3d(0, 0, 0);
+      filter: blur(10px);
+      opacity: 0.55;
+      animation: neon-far-pulse 6.8s ease-in-out infinite;
+    }
+    .neon-far::after {
+      background:
+        radial-gradient(160px 55px at 68% 56%, rgb(var(--accent2-rgb) / 0.14), transparent 70%),
+        radial-gradient(210px 80px at 82% 61%, rgb(var(--accent-rgb) / 0.18), transparent 72%),
+        linear-gradient(92deg, transparent 0%, rgb(255 255 255 / 0.05) 48%, transparent 100%);
+      filter: blur(14px);
+      opacity: 0.40;
+      animation: neon-far-drift 9.5s ease-in-out infinite, neon-far-flicker 12s steps(1, end) infinite;
+    }
+
+    @keyframes neon-far-pulse {
+      0%, 100% { opacity: 0.48; transform: translateY(0px) scale(1); }
+      45% { opacity: 0.68; transform: translateY(-1px) scale(1.01); }
+      60% { opacity: 0.56; transform: translateY(0px) scale(1.005); }
+    }
+    @keyframes neon-far-drift {
+      0%, 100% { transform: translate3d(-3px, 0px, 0) scale(1); }
+      50% { transform: translate3d(3px, -1px, 0) scale(1.01); }
+    }
+    @keyframes neon-far-flicker {
+      0% { opacity: 0.40; }
+      7% { opacity: 0.18; }
+      8% { opacity: 0.45; }
+      19% { opacity: 0.32; }
+      20% { opacity: 0.47; }
+      41% { opacity: 0.22; }
+      42% { opacity: 0.44; }
+      71% { opacity: 0.35; }
+      72% { opacity: 0.48; }
+      100% { opacity: 0.40; }
+    }
+
+    .hotspots {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .hotspots a { cursor: pointer; }
+    .hotspots rect {
+      fill: rgb(var(--hot) / 0.02);
+      stroke: transparent;
+      stroke-width: 6px;
+      vector-effect: non-scaling-stroke;
+    }
+    .hotspots a:hover rect {
+      fill: rgb(var(--hot) / 0.07);
+      stroke: transparent;
+    }
+    .hotspots a:focus-visible rect {
+      fill: rgb(var(--hot) / 0.10);
+      stroke: rgb(var(--hot) / 0.90);
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    body:not(.in-shell) .standalone-exit {
+      display: inline-block;
+    }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+    .standalone-exit:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.45);
+      outline-offset: 3px;
+    }
+
+    .viz-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      padding: clamp(12px, 3vw, 28px);
+      background: rgb(0 0 0 / 0.55);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    .viz-overlay.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .viz-overlay__panel {
+      width: min(1100px, 96vw);
+      height: min(820px, 92vh);
+      border: 1px solid rgba(232, 238, 246, 0.18);
+      border-radius: 14px;
+      background: rgb(6 12 18 / 0.78);
+      box-shadow:
+        0 22px 70px rgb(0 0 0 / 0.55),
+        0 0 0 1px rgb(var(--accent-rgb) / 0.10) inset;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .viz-overlay__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.75rem 0.9rem;
+      border-bottom: 1px solid rgba(232, 238, 246, 0.12);
+      background: linear-gradient(180deg, rgb(6 12 18 / 0.75), rgb(6 12 18 / 0.35));
+    }
+    .viz-overlay__title {
+      font-size: 0.9rem;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      opacity: 0.92;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .viz-overlay__actions {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    .viz-btn {
+      appearance: none;
+      border: 1px solid rgba(232, 238, 246, 0.18);
+      background: rgb(255 255 255 / 0.04);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+    }
+    .viz-btn:hover {
+      background: rgb(var(--accent-rgb) / 0.10);
+      border-color: rgb(var(--accent-rgb) / 0.40);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+    .viz-btn:active { transform: translateY(1px); }
+    .viz-btn:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.55);
+      outline-offset: 2px;
+    }
+    .viz-btn.subtle {
+      color: var(--text-muted);
+      background: transparent;
+    }
+    .viz-overlay__body {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      display: grid;
+    }
+    .viz-chooser {
+      display: grid;
+      gap: 0.9rem;
+      align-content: center;
+      justify-items: center;
+      padding: clamp(16px, 4vw, 40px);
+      text-align: center;
+    }
+    .viz-chooser h2 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .viz-chooser p {
+      margin: 0;
+      max-width: 52ch;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+    .viz-chooser__grid {
+      width: min(760px, 100%);
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.6rem;
+    }
+    @media (max-width: 720px) {
+      .viz-chooser__grid { grid-template-columns: 1fr; }
+    }
+    .viz-card {
+      text-align: left;
+      padding: 0.95rem 1rem;
+      border-radius: 14px;
+      border: 1px solid rgba(232, 238, 246, 0.14);
+      background: rgb(255 255 255 / 0.03);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .viz-card[data-viz="bubble"] {
+      background: linear-gradient(180deg, rgba(125, 240, 255, 0.08), rgba(255, 255, 255, 0.02));
+      border-color: rgba(125, 240, 255, 0.18);
+    }
+    .viz-card[data-viz="defi"] {
+      background: linear-gradient(180deg, rgba(255, 93, 93, 0.08), rgba(255, 255, 255, 0.02));
+      border-color: rgba(255, 93, 93, 0.18);
+    }
+    .viz-card:hover {
+      transform: translateY(-1px);
+      border-color: rgb(var(--accent-rgb) / 0.45);
+      background: rgb(var(--accent-rgb) / 0.06);
+      box-shadow: 0 10px 30px rgb(0 0 0 / 0.22);
+    }
+    .viz-card[data-viz="bubble"]:hover {
+      border-color: rgba(125, 240, 255, 0.45);
+      background: linear-gradient(180deg, rgba(125, 240, 255, 0.12), rgba(255, 255, 255, 0.03));
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 0 0 3px rgba(125, 240, 255, 0.08);
+    }
+    .viz-card[data-viz="defi"]:hover {
+      border-color: rgba(255, 93, 93, 0.45);
+      background: linear-gradient(180deg, rgba(255, 93, 93, 0.12), rgba(255, 255, 255, 0.03));
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 0 0 3px rgba(255, 93, 93, 0.08);
+    }
+    .viz-card__kicker {
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgb(var(--accent-rgb) / 0.95);
+      margin-bottom: 0.25rem;
+    }
+    .viz-card__title {
+      margin: 0 0 0.35rem 0;
+      font-size: 1rem;
+      font-weight: 650;
+      color: var(--text);
+    }
+    .viz-card__desc {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+    .viz-amm {
+      display: none;
+      min-height: 0;
+      height: 100%;
+      overflow: auto;
+      padding: 1.25rem;
+      color: var(--cyan);
+      font-family: "SF Mono", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, monospace;
+      background: rgba(6, 14, 20, 0.55);
+    }
+
+    .viz-bubble {
+      display: none;
+      min-height: 0;
+      height: 100%;
+      overflow: auto;
+      padding: 1.25rem;
+      color: var(--cyan);
+      font-family: "SF Mono", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, monospace;
+      background: rgba(6, 14, 20, 0.55);
+    }
+
+    .viz-overlay[data-view="bubble"] .viz-bubble { display: block; }
+    .viz-overlay[data-view="bubble"] .viz-chooser { display: none; }
+    .viz-overlay[data-view="bubble"] .viz-amm { display: none; }
+
+    .viz-overlay[data-view="amm"] .viz-amm { display: block; }
+    .viz-overlay[data-view="amm"] .viz-chooser { display: none; }
+    .viz-overlay[data-view="amm"] .viz-bubble { display: none; }
+
+    /* Bubble Sort UI */
+    .bubble-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.05fr;
+      gap: 1rem;
+      min-height: 0;
+    }
+    @media (max-width: 900px) {
+      .bubble-grid { grid-template-columns: 1fr; }
+    }
+    .bubble-left, .bubble-right {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 0;
+    }
+
+    .bubble-bars {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 1fr;
+      align-items: end;
+      gap: 6px;
+      height: 280px;
+      padding: 12px;
+      background: rgba(6, 10, 14, 0.6);
+      border-radius: 6px;
+      border: 1px solid rgba(93, 232, 208, 0.12);
+    }
+    .bubble-bar {
+      position: relative;
+      width: 100%;
+      height: 30%;
+      border-radius: 6px 6px 4px 4px;
+      background: linear-gradient(180deg, rgba(93, 232, 208, 0.95), rgba(93, 232, 208, 0.35));
+      box-shadow: 0 0 18px rgba(93, 232, 208, 0.14);
+      transition: transform 0.12s ease, filter 0.12s ease, background 0.12s ease;
+      filter: saturate(1.05);
+    }
+    .bubble-bar[data-state="compare"] {
+      background: linear-gradient(180deg, rgba(255, 197, 109, 0.95), rgba(255, 197, 109, 0.35));
+      box-shadow: 0 0 18px rgba(255, 197, 109, 0.14);
+    }
+    .bubble-bar[data-state="swap"] {
+      background: linear-gradient(180deg, rgba(192, 132, 255, 0.95), rgba(192, 132, 255, 0.35));
+      box-shadow: 0 0 18px rgba(192, 132, 255, 0.16);
+      transform: translateY(-2px);
+    }
+    .bubble-bar[data-state="done"] {
+      background: linear-gradient(180deg, rgba(125, 240, 255, 0.95), rgba(125, 240, 255, 0.25));
+      box-shadow: 0 0 16px rgba(125, 240, 255, 0.10);
+      filter: saturate(0.95);
+    }
+    .bubble-bar .bubble-val {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 4px;
+      text-align: center;
+      font-size: 0.7rem;
+      color: rgba(232, 238, 246, 0.7);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    .bubble-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .bubble-controls .viz-btn {
+      padding: 0.45rem 0.7rem;
+      font-size: 0.85rem;
+    }
+    .bubble-controls .viz-btn.primary {
+      border-color: rgba(93, 232, 208, 0.35);
+      background: rgba(93, 232, 208, 0.12);
+      color: var(--cyan);
+    }
+    .bubble-controls .viz-btn.primary:hover {
+      border-color: rgba(93, 232, 208, 0.55);
+      background: rgba(93, 232, 208, 0.18);
+      box-shadow: 0 0 0 3px rgba(93, 232, 208, 0.12);
+    }
+    .bubble-controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.78rem;
+      color: rgba(232, 238, 246, 0.66);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    .bubble-controls input[type="range"] {
+      width: 170px;
+      height: 4px;
+      background: rgba(93, 232, 208, 0.15);
+      border-radius: 2px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .bubble-controls input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--cyan);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(93, 232, 208, 0.5);
+    }
+    .bubble-controls input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: var(--cyan);
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 10px rgba(93, 232, 208, 0.5);
+    }
+
+    .bubble-editor {
+      display: grid;
+      gap: 0.5rem;
+    }
+    .bubble-editor textarea {
+      width: 100%;
+      min-height: 84px;
+      resize: vertical;
+      background: rgba(93, 232, 208, 0.06);
+      border: 1px solid rgba(93, 232, 208, 0.18);
+      border-radius: 6px;
+      padding: 0.6rem;
+      color: rgba(232, 238, 246, 0.88);
+      font-family: inherit;
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
+    .bubble-editor textarea:focus {
+      outline: none;
+      border-color: rgba(93, 232, 208, 0.45);
+      box-shadow: 0 0 0 3px rgba(93, 232, 208, 0.12);
+    }
+    .bubble-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      font-size: 0.78rem;
+      color: rgba(232, 238, 246, 0.62);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    .bubble-meta strong { color: rgba(232, 238, 246, 0.86); font-weight: 600; }
+
+    .bubble-code {
+      margin: 0;
+      padding: 0.75rem 0.85rem;
+      border-radius: 6px;
+      background: rgba(6, 10, 14, 0.65);
+      border: 1px solid rgba(93, 232, 208, 0.12);
+      overflow: auto;
+      color: rgba(232, 238, 246, 0.86);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+    .bubble-code .tok-kw { color: rgba(125, 240, 255, 0.95); }
+    .bubble-code .tok-num { color: rgba(255, 197, 109, 0.92); }
+    .bubble-code .tok-op { color: rgba(232, 238, 246, 0.88); }
+    .bubble-code .tok-fn { color: rgba(93, 232, 208, 0.95); }
+    .bubble-code .tok-id { color: rgba(232, 238, 246, 0.84); }
+    .bubble-code .tok-br { color: rgba(232, 238, 246, 0.70); }
+    .bubble-code .tok-com { color: rgba(232, 238, 246, 0.45); font-style: italic; }
+    .bubble-code__lang {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-bottom: 0.55rem;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(232, 238, 246, 0.60);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    .bubble-code__lang::before {
+      content: "JS";
+      display: inline-grid;
+      place-items: center;
+      width: 1.6rem;
+      height: 1.1rem;
+      border-radius: 6px;
+      background: rgba(125, 240, 255, 0.12);
+      border: 1px solid rgba(125, 240, 255, 0.18);
+      color: rgba(125, 240, 255, 0.95);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      text-transform: none;
+      font-size: 0.68rem;
+    }
+
+    /* AMM UI (ported from tools/tool-defi-amm.html) */
+    .amm-intro {
+      text-align: center;
+      padding: 0.25rem 0;
+    }
+    .amm-intro h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.1rem;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+      text-shadow: 0 0 15px rgba(93, 232, 208, 0.3);
+    }
+    .amm-intro .subtitle {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin: 0;
+      color: var(--text-muted);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 1rem;
+      min-height: 0;
+    }
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+    .left-col, .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 0;
+    }
+
+    .panel {
+      background: rgba(93, 232, 208, 0.05);
+      border: 1px solid rgba(93, 232, 208, 0.15);
+      border-radius: 6px;
+      padding: 1rem;
+    }
+    .panel h3 {
+      margin: 0 0 1rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      opacity: 0.7;
+      font-weight: 400;
+      color: var(--text-muted);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    .reserves-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .reserve-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .token-name-input {
+      background: rgba(93, 232, 208, 0.08);
+      border: 1px solid rgba(93, 232, 208, 0.2);
+      border-radius: 4px;
+      padding: 0.4rem;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 0.75rem;
+      text-align: center;
+    }
+    .token-name-input:focus {
+      outline: none;
+      border-color: rgba(93, 232, 208, 0.4);
+      box-shadow: 0 0 0 3px rgba(93, 232, 208, 0.12);
+    }
+    .reserve-num-input {
+      background: rgba(93, 232, 208, 0.08);
+      border: 1px solid rgba(93, 232, 208, 0.2);
+      border-radius: 4px;
+      padding: 0.5rem;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 1rem;
+      text-align: center;
+    }
+    .reserve-num-input:focus {
+      outline: none;
+      border-color: rgba(93, 232, 208, 0.4);
+      box-shadow: 0 0 0 3px rgba(93, 232, 208, 0.12);
+    }
+    .k-display {
+      text-align: center;
+      font-size: 0.85rem;
+      opacity: 0.9;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(93, 232, 208, 0.1);
+    }
+
+    .direction-toggle {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .direction-toggle button {
+      flex: 1;
+      padding: 0.5rem;
+      background: rgba(93, 232, 208, 0.08);
+      border: 1px solid rgba(93, 232, 208, 0.2);
+      border-radius: 4px;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .direction-toggle button:hover {
+      background: rgba(93, 232, 208, 0.12);
+      border-color: rgba(93, 232, 208, 0.35);
+    }
+    .direction-toggle button.active {
+      background: rgba(93, 232, 208, 0.2);
+      border-color: rgba(93, 232, 208, 0.5);
+      box-shadow: 0 0 15px rgba(93, 232, 208, 0.15);
+    }
+
+    .swap-input {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .swap-input input {
+      flex: 1;
+      background: rgba(93, 232, 208, 0.08);
+      border: 1px solid rgba(93, 232, 208, 0.2);
+      border-radius: 4px;
+      padding: 0.5rem;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 1rem;
+    }
+    .swap-input input:focus {
+      outline: none;
+      border-color: rgba(93, 232, 208, 0.4);
+      box-shadow: 0 0 0 3px rgba(93, 232, 208, 0.12);
+    }
+    .swap-input span {
+      font-size: 0.75rem;
+      opacity: 0.8;
+      min-width: 4rem;
+    }
+
+    .stats-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0.75rem;
+      background: rgba(93, 232, 208, 0.05);
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+    .stat-item.negative .stat-value { color: var(--danger); }
+    .stat-label { opacity: 0.65; }
+    .stat-value {
+      color: var(--accent2);
+      font-weight: 500;
+    }
+
+    .chart-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .curve-wrap {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 4px;
+      background: rgba(6, 10, 14, 0.6);
+      overflow: hidden;
+    }
+    .curve-wrap canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .legend {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 0.5rem;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      opacity: 0.85;
+    }
+    .legend .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .legend .dot.current { background: var(--cyan); }
+    .legend .dot.after { background: var(--accent2); }
+
+    .simplifications {
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: rgba(93, 232, 208, 0.03);
+      border: 1px solid rgba(93, 232, 208, 0.1);
+      border-radius: 4px;
+      font-size: 0.7rem;
+      opacity: 0.92;
+      color: var(--text-muted);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    .simplifications h4 {
+      margin: 0 0 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      opacity: 0.9;
+      color: var(--text);
+    }
+    .simplifications ul {
+      margin: 0;
+      padding-left: 1.2rem;
+      opacity: 0.85;
+    }
+    .simplifications li { margin-bottom: 0.25rem; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg { transform: none; }
+      .neon-far { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="scene">
+    <img class="bg" src="../pics/rooftop-main.jpg" alt="Rainy cyberpunk rooftop with Web3 Interactive Learning Portal and neon-lit street below.">
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot" aria-hidden="true"></div>
+    <div class="neon-far" aria-hidden="true"></div>
+
+    <svg class="hotspots" viewBox="0 0 1376 768" preserveAspectRatio="xMidYMid slice" aria-label="Rooftop hotspots">
+      <a href="street.html" aria-label="Back to Street">
+        <rect x="120" y="80" width="520" height="480" rx="14" ry="14"></rect>
+      </a>
+      <a href="#" class="viz-open" aria-label="Open visualizations">
+        <rect x="730" y="180" width="400" height="400" rx="14" ry="14"></rect>
+      </a>
+    </svg>
+
+    <div class="viz-overlay" id="viz-overlay" data-view="choose" aria-hidden="true">
+      <div class="viz-overlay__panel" role="dialog" aria-modal="true" aria-label="Visualizations">
+        <div class="viz-overlay__header">
+          <div class="viz-overlay__title" id="viz-overlay-title">Choose a visualization</div>
+          <div class="viz-overlay__actions">
+            <button type="button" class="viz-btn subtle" id="viz-overlay-back" aria-label="Back to chooser" title="Back" hidden>Back</button>
+            <button type="button" class="viz-btn subtle" id="viz-overlay-close" aria-label="Close overlay" title="Close">Close</button>
+          </div>
+        </div>
+        <div class="viz-overlay__body">
+          <div class="viz-chooser" id="viz-chooser">
+            <h2>Choose a visualization</h2>
+            <p>"You pick the blue one... you learn sorting algorithms like a normal person. You pick the red... and eventually lose all your money on crypto."</p>
+            <div class="viz-chooser__grid">
+              <button type="button" class="viz-card" data-viz="bubble">
+                <div class="viz-card__kicker">Algorithms</div>
+                <div class="viz-card__title">Bubble Sort</div>
+                <p class="viz-card__desc">Compare neighbors, swap, and watch the array bubble into order.</p>
+              </button>
+              <button type="button" class="viz-card" data-viz="defi">
+                <div class="viz-card__kicker">DeFi</div>
+                <div class="viz-card__title">AMM Price Impact</div>
+                <p class="viz-card__desc">Constant product curve + swap price impact demo.</p>
+              </button>
+            </div>
+          </div>
+          <div class="viz-amm" id="viz-amm" aria-label="AMM visualization">
+            <div class="amm-intro">
+              <h1>AMM Price Impact</h1>
+              <p class="subtitle">See how the constant product formula affects swap prices</p>
+            </div>
+
+            <div class="main-grid">
+              <div class="left-col">
+                <div class="panel">
+                  <h3>Pool Reserves</h3>
+                  <div class="reserves-grid">
+                    <div class="reserve-input-group">
+                      <input type="text" id="token-x-name" class="token-name-input" value="Token X" maxlength="12">
+                      <input type="number" id="reserve-x-input" class="reserve-num-input" value="1000" min="1" step="1">
+                    </div>
+                    <div class="reserve-input-group">
+                      <input type="text" id="token-y-name" class="token-name-input" value="Token Y" maxlength="12">
+                      <input type="number" id="reserve-y-input" class="reserve-num-input" value="1000" min="1" step="1">
+                    </div>
+                  </div>
+                  <div class="k-display">k = <span id="k-value">1,000,000</span></div>
+                </div>
+
+                <div class="panel">
+                  <h3>Swap</h3>
+                  <div class="direction-toggle">
+                    <button id="dir-x-to-y" class="active">Swap Token X → Token Y</button>
+                    <button id="dir-y-to-x">Swap Token Y → Token X</button>
+                  </div>
+                  <div class="swap-input">
+                    <input type="number" id="swap-amount" value="100" min="0" step="0.01">
+                    <span id="swap-token">Token X</span>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <h3>Swap Results</h3>
+                  <div class="stats-list">
+                    <div class="stat-item">
+                      <span class="stat-label">You Send</span>
+                      <span class="stat-value" id="send-amount">100.00 X</span>
+                    </div>
+                    <div class="stat-item">
+                      <span class="stat-label">You Receive</span>
+                      <span class="stat-value" id="receive-amount">— Y</span>
+                    </div>
+                    <div class="stat-item">
+                      <span class="stat-label">Spot Price (before)</span>
+                      <span class="stat-value" id="spot-price">1.00</span>
+                    </div>
+                    <div class="stat-item">
+                      <span class="stat-label">Execution Price</span>
+                      <span class="stat-value" id="exec-price">—</span>
+                    </div>
+                    <div class="stat-item negative" id="impact-stat">
+                      <span class="stat-label">Price Impact</span>
+                      <span class="stat-value" id="price-impact">—</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="right-col">
+                <div class="panel chart-panel">
+                  <h3>Constant Product Curve</h3>
+                  <div class="curve-wrap" aria-label="Constant product curve (square)">
+                    <canvas id="curve-canvas"></canvas>
+                  </div>
+                  <div class="legend">
+                    <span><span class="dot current"></span> Current Position</span>
+                    <span><span class="dot after"></span> After Swap</span>
+                  </div>
+                </div>
+
+                <div class="simplifications">
+                  <h4>ℹ️ Simplifications</h4>
+                  <ul>
+                    <li><strong>No Fees:</strong> Real AMMs charge swap fees, which worsen execution price.</li>
+                    <li><strong>Manual Reserves:</strong> You set pool reserves directly; this doesn't simulate deposits/withdrawals.</li>
+                    <li><strong>Single-Swap View:</strong> The pool doesn't persist state after a swap.</li>
+                    <li><strong>External Markets:</strong> Ignores outside prices, arbitrage, and LP behavior.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="viz-bubble" id="viz-bubble" aria-label="Bubble sort visualization">
+            <div class="amm-intro">
+              <h1>Bubble Sort</h1>
+              <p class="subtitle">Compare neighbors and swap. Watch the array bubble into order.</p>
+            </div>
+
+            <div class="bubble-grid">
+              <div class="bubble-left">
+                <div class="panel">
+                  <h3>Controls</h3>
+                  <div class="bubble-controls">
+                    <button type="button" class="viz-btn primary" id="bubble-next">Next</button>
+                    <button type="button" class="viz-btn" id="bubble-play">▶ Play</button>
+                    <button type="button" class="viz-btn" id="bubble-reset">Reset</button>
+                    <button type="button" class="viz-btn" id="bubble-random">Random</button>
+                    <label>
+                      Speed
+                      <input type="range" id="bubble-speed" min="0" max="100" value="55">
+                    </label>
+                  </div>
+                  <div class="bubble-meta" style="margin-top:0.65rem">
+                    <span><strong id="bubble-pass">0</strong> pass</span>
+                    <span><strong id="bubble-compare">0</strong> comparisons</span>
+                    <span><strong id="bubble-swap">0</strong> swaps</span>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <h3>Array</h3>
+                  <div class="bubble-bars" id="bubble-bars" aria-label="Array visualization"></div>
+                </div>
+              </div>
+
+              <div class="bubble-right">
+                <div class="panel">
+                  <h3>Edit array</h3>
+                  <div class="bubble-editor">
+                    <textarea id="bubble-input" spellcheck="false">5, 1, 4, 2, 8, 3, 7, 6</textarea>
+                    <div class="bubble-controls">
+                      <button type="button" class="viz-btn" id="bubble-apply">Apply</button>
+                      <button type="button" class="viz-btn subtle" id="bubble-shuffle">Shuffle</button>
+                    </div>
+                    <div class="bubble-meta">
+                      <span>Format: comma/space separated numbers</span>
+                      <span>Size: <strong id="bubble-size">8</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <h3>Algorithm</h3>
+                  <div class="bubble-code__lang">JavaScript example</div>
+                  <pre class="bubble-code" aria-label="Bubble sort code (JavaScript)"><code><span class="tok-kw">for</span> (<span class="tok-kw">let</span> <span class="tok-id">i</span> <span class="tok-op">=</span> <span class="tok-num">0</span>; <span class="tok-id">i</span> <span class="tok-op">&lt;</span> <span class="tok-id">n</span> <span class="tok-op">-</span> <span class="tok-num">1</span>; <span class="tok-id">i</span><span class="tok-op">++</span>) <span class="tok-br">{</span>
+  <span class="tok-kw">for</span> (<span class="tok-kw">let</span> <span class="tok-id">j</span> <span class="tok-op">=</span> <span class="tok-num">0</span>; <span class="tok-id">j</span> <span class="tok-op">&lt;</span> <span class="tok-id">n</span> <span class="tok-op">-</span> <span class="tok-num">1</span> <span class="tok-op">-</span> <span class="tok-id">i</span>; <span class="tok-id">j</span><span class="tok-op">++</span>) <span class="tok-br">{</span>
+    <span class="tok-kw">if</span> (<span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span><span class="tok-br">]</span> <span class="tok-op">&gt;</span> <span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span> <span class="tok-op">+</span> <span class="tok-num">1</span><span class="tok-br">]</span>) <span class="tok-br">{</span>
+      <span class="tok-br">[</span><span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span><span class="tok-br">]</span>, <span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span> <span class="tok-op">+</span> <span class="tok-num">1</span><span class="tok-br">]</span><span class="tok-br">]</span> <span class="tok-op">=</span> <span class="tok-br">[</span><span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span> <span class="tok-op">+</span> <span class="tok-num">1</span><span class="tok-br">]</span>, <span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span><span class="tok-br">]</span><span class="tok-br">]</span>;
+    <span class="tok-br">}</span>
+  <span class="tok-br">}</span>
+<span class="tok-br">}</span></code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+  </main>
+
+  <script src="../js/scene-common.js"></script>
+  <script>
+    (function () {
+      var overlay = document.getElementById('viz-overlay');
+      var openBtn = document.querySelector('a.viz-open');
+      var closeBtn = document.getElementById('viz-overlay-close');
+      var backBtn = document.getElementById('viz-overlay-back');
+      var title = document.getElementById('viz-overlay-title');
+      var chooser = document.getElementById('viz-chooser');
+      var ammRoot = document.getElementById('viz-amm');
+      var bubbleRoot = document.getElementById('viz-bubble');
+      if (!overlay || !openBtn || !closeBtn || !backBtn || !title || !chooser || !ammRoot || !bubbleRoot) return;
+
+      var ammInited = false;
+      var ammUpdate = null;
+      var bubbleInited = false;
+      var bubbleApi = null;
+
+      var VIZ = {
+        defi: { label: 'AMM Price Impact', kind: 'amm' },
+        bubble: { label: 'Bubble Sort', kind: 'bubble' }
+      };
+
+      function showChooser() {
+        overlay.dataset.view = 'choose';
+        title.textContent = 'Choose a visualization';
+        backBtn.hidden = true;
+      }
+
+      function showViz(key) {
+        var entry = VIZ[key];
+        if (!entry) return;
+        title.textContent = entry.label;
+        backBtn.hidden = false;
+        if (entry.kind === 'amm') {
+          overlay.dataset.view = 'amm';
+          if (!ammInited) {
+            var api = initAmm();
+            ammUpdate = api && api.update ? api.update : null;
+            ammInited = true;
+          }
+          if (ammUpdate) requestAnimationFrame(ammUpdate);
+        } else if (entry.kind === 'bubble') {
+          overlay.dataset.view = 'bubble';
+          if (!bubbleInited) {
+            bubbleApi = initBubble();
+            bubbleInited = true;
+          }
+          if (bubbleApi && bubbleApi.refresh) requestAnimationFrame(bubbleApi.refresh);
+        }
+      }
+
+      function openOverlay(opts) {
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        if (opts && opts.viz) showViz(opts.viz);
+        else showChooser();
+      }
+
+      function closeOverlay() {
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        overlay.dataset.view = 'choose';
+        if (bubbleApi && bubbleApi.stop) bubbleApi.stop();
+      }
+
+      openBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        openOverlay();
+      });
+
+      chooser.addEventListener('click', function (e) {
+        var t = e.target;
+        var btn = t && t.closest ? t.closest('button[data-viz]') : null;
+        if (!btn) return;
+        showViz(btn.getAttribute('data-viz'));
+      });
+
+      closeBtn.addEventListener('click', closeOverlay);
+      backBtn.addEventListener('click', showChooser);
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeOverlay();
+      });
+      window.addEventListener('keydown', function (e) {
+        if (!overlay.classList.contains('is-open')) return;
+        if (e.key === 'Escape') closeOverlay();
+      });
+
+      try {
+        var params = new URLSearchParams(window.location.search || '');
+        var auto = params.get('viz') || params.get('v') || '';
+        if (auto) {
+          var normalized = auto === '1' || auto === 'choose' ? '' : auto;
+          if (normalized && !VIZ[normalized]) normalized = '';
+          openOverlay(normalized ? { viz: normalized } : null);
+        }
+      } catch (_) {}
+
+      function initBubble() {
+        var elBars = document.getElementById('bubble-bars');
+        var elPlay = document.getElementById('bubble-play');
+        var elNext = document.getElementById('bubble-next');
+        var elReset = document.getElementById('bubble-reset');
+        var elRandom = document.getElementById('bubble-random');
+        var elSpeed = document.getElementById('bubble-speed');
+        var elInput = document.getElementById('bubble-input');
+        var elApply = document.getElementById('bubble-apply');
+        var elShuffle = document.getElementById('bubble-shuffle');
+        var elPass = document.getElementById('bubble-pass');
+        var elCompare = document.getElementById('bubble-compare');
+        var elSwap = document.getElementById('bubble-swap');
+        var elSize = document.getElementById('bubble-size');
+        if (!elBars || !elPlay || !elNext || !elReset || !elRandom || !elSpeed || !elInput || !elApply || !elShuffle || !elPass || !elCompare || !elSwap || !elSize) return null;
+
+        var base = [];
+        var arr = [];
+        var n = 0;
+        var i = 0;
+        var j = 0;
+        var compareCount = 0;
+        var swapCount = 0;
+        var passCount = 0;
+        var running = false;
+        var timer = 0;
+        var bars = [];
+        var phase = 'compare'; // 'compare' -> show comparison, 'resolve' -> swap/advance
+        var pendingSwap = false;
+        var animating = false;
+
+        function clampSize(x) {
+          return Math.max(2, Math.min(24, x));
+        }
+
+        function parseArray(text) {
+          var parts = (text || '').split(/[\s,]+/).filter(Boolean);
+          var nums = [];
+          for (var k = 0; k < parts.length; k++) {
+            var v = Number(parts[k]);
+            if (!Number.isFinite(v)) continue;
+            nums.push(Math.round(v));
+          }
+          nums = nums.slice(0, 24);
+          if (nums.length < 2) nums = [5, 1, 4, 2, 8, 3, 7, 6];
+          return nums;
+        }
+
+        function randomArray(size) {
+          var s = clampSize(size || 10);
+          var out = [];
+          for (var k = 0; k < s; k++) out.push(1 + Math.floor(Math.random() * 99));
+          return out;
+        }
+
+        function shuffleInPlace(a) {
+          for (var k = a.length - 1; k > 0; k--) {
+            var r = Math.floor(Math.random() * (k + 1));
+            var t = a[k]; a[k] = a[r]; a[r] = t;
+          }
+        }
+
+        function setButtonState() {
+          elPlay.textContent = running ? '⏸ Pause' : '▶ Play';
+          elNext.disabled = running;
+          elApply.disabled = running;
+          elShuffle.disabled = running;
+        }
+
+        function speedMs() {
+          var v = parseInt(elSpeed.value, 10);
+          if (!Number.isFinite(v)) v = 55;
+          var t = 1 - (Math.max(0, Math.min(100, v)) / 100);
+          return Math.round(30 + 420 * (t * t));
+        }
+
+        function clearStates() {
+          for (var k = 0; k < bars.length; k++) bars[k].dataset.state = '';
+        }
+
+        function renderBars() {
+          elBars.innerHTML = '';
+          bars = [];
+          var maxV = 1;
+          for (var k = 0; k < arr.length; k++) maxV = Math.max(maxV, arr[k]);
+          for (var idx = 0; idx < arr.length; idx++) {
+            var bar = document.createElement('div');
+            bar.className = 'bubble-bar';
+            var h = (arr[idx] / maxV) * 100;
+            bar.style.height = Math.max(6, h) + '%';
+            var lab = document.createElement('div');
+            lab.className = 'bubble-val';
+            lab.textContent = String(arr[idx]);
+            bar.appendChild(lab);
+            elBars.appendChild(bar);
+            bars.push(bar);
+          }
+          elSize.textContent = String(arr.length);
+        }
+
+        function renderMeta() {
+          elCompare.textContent = String(compareCount);
+          elSwap.textContent = String(swapCount);
+          elPass.textContent = String(passCount);
+        }
+
+        function resetToBase() {
+          arr = base.slice();
+          n = arr.length;
+          i = 0; j = 0;
+          compareCount = 0;
+          swapCount = 0;
+          passCount = 0;
+          phase = 'compare';
+          pendingSwap = false;
+          animating = false;
+          running = false;
+          stop();
+          renderBars();
+          clearStates();
+          markDoneTail();
+          renderMeta();
+          setButtonState();
+        }
+
+        function setBase(newBase) {
+          base = newBase.slice();
+          elInput.value = base.join(', ');
+          resetToBase();
+        }
+
+        function markDoneTail() {
+          var doneFrom = n - i;
+          for (var idx = 0; idx < bars.length; idx++) {
+            if (idx >= doneFrom) bars[idx].dataset.state = 'done';
+          }
+        }
+
+        function ensurePassPosition() {
+          if (i >= n - 1) return false;
+          if (j < n - 1 - i) return true;
+          i++;
+          j = 0;
+          passCount++;
+          phase = 'compare';
+          pendingSwap = false;
+          return i < n - 1;
+        }
+
+        function markSortedIfDone() {
+          if (i < n - 1) return;
+          clearStates();
+          for (var idx = 0; idx < bars.length; idx++) bars[idx].dataset.state = 'done';
+        }
+
+        function animateSwapAt(idx) {
+          if (animating) return Promise.resolve(false);
+          animating = true;
+          var aEl = bars[idx];
+          var bEl = bars[idx + 1];
+          if (!aEl || !bEl) {
+            animating = false;
+            return Promise.resolve(false);
+          }
+
+          aEl.dataset.state = 'swap';
+          bEl.dataset.state = 'swap';
+
+          var aBefore = aEl.getBoundingClientRect();
+          var bBefore = bEl.getBoundingClientRect();
+
+          elBars.insertBefore(bEl, aEl);
+          bars = Array.prototype.slice.call(elBars.children);
+
+          var aAfter = aEl.getBoundingClientRect();
+          var bAfter = bEl.getBoundingClientRect();
+
+          var aDx = aBefore.left - aAfter.left;
+          var bDx = bBefore.left - bAfter.left;
+
+          aEl.style.transition = 'none';
+          bEl.style.transition = 'none';
+          aEl.style.transform = 'translateX(' + aDx + 'px)';
+          bEl.style.transform = 'translateX(' + bDx + 'px)';
+
+          aEl.offsetHeight;
+
+          return new Promise(function (resolve) {
+            var done = 0;
+            var finished = false;
+            function finish(ok) {
+              if (finished) return;
+              finished = true;
+              aEl.style.transition = '';
+              bEl.style.transition = '';
+              aEl.style.transform = '';
+              bEl.style.transform = '';
+              animating = false;
+              resolve(ok);
+            }
+            function onEnd() {
+              done++;
+              if (done >= 2) finish(true);
+            }
+            aEl.addEventListener('transitionend', onEnd, { once: true });
+            bEl.addEventListener('transitionend', onEnd, { once: true });
+
+            requestAnimationFrame(function () {
+              aEl.style.transition = 'transform 180ms ease';
+              bEl.style.transition = 'transform 180ms ease';
+              aEl.style.transform = 'translateX(0px)';
+              bEl.style.transform = 'translateX(0px)';
+            });
+
+            window.setTimeout(function () { finish(true); }, 260);
+          });
+        }
+
+        function nextAction() {
+          if (overlay.dataset.view !== 'bubble') return Promise.resolve(false);
+          if (animating) return Promise.resolve(true);
+
+          if (i >= n - 1) {
+            markSortedIfDone();
+            renderMeta();
+            return Promise.resolve(false);
+          }
+
+          if (!ensurePassPosition()) {
+            markSortedIfDone();
+            renderMeta();
+            return Promise.resolve(false);
+          }
+
+          clearStates();
+          markDoneTail();
+
+          if (phase === 'compare') {
+            bars[j].dataset.state = 'compare';
+            bars[j + 1].dataset.state = 'compare';
+            compareCount++;
+            pendingSwap = arr[j] > arr[j + 1];
+            phase = 'resolve';
+            renderMeta();
+            return Promise.resolve(true);
+          }
+
+          if (pendingSwap) {
+            var tmp = arr[j]; arr[j] = arr[j + 1]; arr[j + 1] = tmp;
+            swapCount++;
+            var curJ = j;
+            pendingSwap = false;
+            phase = 'compare';
+            return animateSwapAt(curJ).then(function () {
+              clearStates();
+              markDoneTail();
+              j++;
+              ensurePassPosition();
+              renderMeta();
+              return true;
+            });
+          }
+
+          pendingSwap = false;
+          phase = 'compare';
+          j++;
+          ensurePassPosition();
+          renderMeta();
+          return Promise.resolve(true);
+        }
+
+        function tick() {
+          if (!running) return;
+          nextAction().then(function (cont) {
+            if (!running) return;
+            if (!cont) {
+              running = false;
+              setButtonState();
+              return;
+            }
+            timer = window.setTimeout(tick, speedMs());
+          });
+        }
+
+        function play() {
+          if (running) return;
+          running = true;
+          setButtonState();
+          tick();
+        }
+
+        function pause() {
+          running = false;
+          setButtonState();
+          stop();
+        }
+
+        function stop() {
+          if (timer) {
+            window.clearTimeout(timer);
+            timer = 0;
+          }
+        }
+
+        elPlay.addEventListener('click', function () {
+          if (running) pause();
+          else play();
+        });
+        elNext.addEventListener('click', function () {
+          nextAction();
+        });
+        elReset.addEventListener('click', function () {
+          resetToBase();
+        });
+        elRandom.addEventListener('click', function () {
+          setBase(randomArray(arr.length || 10));
+        });
+        elShuffle.addEventListener('click', function () {
+          var tmp = base.slice();
+          shuffleInPlace(tmp);
+          setBase(tmp);
+        });
+        elApply.addEventListener('click', function () {
+          setBase(parseArray(elInput.value));
+        });
+        elSpeed.addEventListener('input', function () {
+          if (!running) return;
+          stop();
+          timer = window.setTimeout(tick, speedMs());
+        });
+
+        setBase(parseArray(elInput.value));
+        return {
+          stop: stop,
+          refresh: function () {
+            renderBars();
+            renderMeta();
+            setButtonState();
+          }
+        };
+      }
+
+      function initAmm() {
+        var tokenXNameInput = document.getElementById('token-x-name');
+        var tokenYNameInput = document.getElementById('token-y-name');
+        var reserveXInput = document.getElementById('reserve-x-input');
+        var reserveYInput = document.getElementById('reserve-y-input');
+        var kValue = document.getElementById('k-value');
+        var dirXtoY = document.getElementById('dir-x-to-y');
+        var dirYtoX = document.getElementById('dir-y-to-x');
+        var swapAmount = document.getElementById('swap-amount');
+        var swapToken = document.getElementById('swap-token');
+        var sendAmount = document.getElementById('send-amount');
+        var receiveAmount = document.getElementById('receive-amount');
+        var spotPrice = document.getElementById('spot-price');
+        var execPrice = document.getElementById('exec-price');
+        var priceImpact = document.getElementById('price-impact');
+        var impactStat = document.getElementById('impact-stat');
+        var canvas = document.getElementById('curve-canvas');
+        if (!tokenXNameInput || !tokenYNameInput || !reserveXInput || !reserveYInput || !kValue || !dirXtoY || !dirYtoX || !swapAmount || !swapToken || !sendAmount || !receiveAmount || !spotPrice || !execPrice || !priceImpact || !impactStat || !canvas) return null;
+        var ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+
+        var direction = 'x-to-y';
+
+        function formatNum(n, decimals) {
+          if (decimals === void 0) decimals = 2;
+          if (n >= 1000000) return (n / 1000000).toFixed(decimals) + 'M';
+          if (n >= 1000) return (n / 1000).toFixed(decimals) + 'K';
+          return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+        }
+
+        function setupCanvas() {
+          var rect = canvas.getBoundingClientRect();
+          var dpr = window.devicePixelRatio || 1;
+          canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+          canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          return { width: rect.width, height: rect.height };
+        }
+
+        function drawCurve(x0, y0, x1, y1, K) {
+          var dims = setupCanvas();
+          var w = dims.width, h = dims.height;
+          var padding = 50;
+
+          ctx.clearRect(0, 0, w, h);
+
+          ctx.strokeStyle = 'rgba(93, 232, 208, 0.1)';
+          ctx.lineWidth = 1;
+          for (var i = 0; i <= 5; i++) {
+            var gx = padding + (w - 2 * padding) * i / 5;
+            var gy = padding + (h - 2 * padding) * i / 5;
+            ctx.beginPath();
+            ctx.moveTo(gx, padding);
+            ctx.lineTo(gx, h - padding);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(padding, gy);
+            ctx.lineTo(w - padding, gy);
+            ctx.stroke();
+          }
+
+          ctx.strokeStyle = 'rgba(93, 232, 208, 0.3)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(padding, h - padding);
+          ctx.lineTo(w - padding, h - padding);
+          ctx.moveTo(padding, h - padding);
+          ctx.lineTo(padding, padding);
+          ctx.stroke();
+
+          var maxAxis = Math.max(x0, y0, x1 || 0, y1 || 0) * 1.8;
+          ctx.fillStyle = 'rgba(93, 232, 208, 0.6)';
+          ctx.font = '10px SF Mono, monospace';
+          ctx.textAlign = 'center';
+          for (var j = 0; j <= 5; j++) {
+            var val = (maxAxis * j / 5);
+            var tx = padding + (w - 2 * padding) * j / 5;
+            ctx.fillText(formatNum(val, 0), tx, h - padding + 18);
+          }
+          ctx.textAlign = 'right';
+          for (var k = 0; k <= 5; k++) {
+            var v2 = (maxAxis * k / 5);
+            var ty = h - padding - (h - 2 * padding) * k / 5;
+            ctx.fillText(formatNum(v2, 0), padding - 8, ty + 4);
+          }
+
+          ctx.textAlign = 'center';
+          ctx.fillStyle = 'rgba(93, 232, 208, 0.8)';
+          ctx.font = '12px SF Mono, monospace';
+          ctx.fillText('Token X Reserve', w / 2, h - 5);
+          ctx.save();
+          ctx.translate(18, h / 2);
+          ctx.rotate(-Math.PI / 2);
+          ctx.fillText('Token Y Reserve', 0, 0);
+          ctx.restore();
+
+          ctx.strokeStyle = 'rgba(93, 232, 208, 0.5)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          var firstPoint = true;
+          for (var px = padding + 1; px < w - padding; px += 2) {
+            var xVal = ((px - padding) / (w - 2 * padding)) * maxAxis + 0.1;
+            var yVal = K / xVal;
+            var py = h - padding - (yVal / maxAxis) * (h - 2 * padding);
+            if (py >= padding && py <= h - padding) {
+              if (firstPoint) {
+                ctx.moveTo(px, py);
+                firstPoint = false;
+              } else {
+                ctx.lineTo(px, py);
+              }
+            }
+          }
+          ctx.stroke();
+
+          var curX = padding + (x0 / maxAxis) * (w - 2 * padding);
+          var curY = h - padding - (y0 / maxAxis) * (h - 2 * padding);
+          ctx.shadowColor = '#5de8d0';
+          ctx.shadowBlur = 15;
+          ctx.fillStyle = '#5de8d0';
+          ctx.beginPath();
+          ctx.arc(curX, curY, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          var aftX = padding + (x1 / maxAxis) * (w - 2 * padding);
+          var aftY = h - padding - (y1 / maxAxis) * (h - 2 * padding);
+          ctx.shadowColor = '#ffc56d';
+          ctx.shadowBlur = 15;
+          ctx.fillStyle = '#ffc56d';
+          ctx.beginPath();
+          ctx.arc(aftX, aftY, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          ctx.strokeStyle = '#ffc56d';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(curX, curY);
+          ctx.lineTo(aftX, aftY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        function update() {
+          if (overlay.dataset.view !== 'amm') return;
+          var reserveX = parseFloat(reserveXInput.value) || 1000;
+          var reserveY = parseFloat(reserveYInput.value) || 1000;
+          var K = reserveX * reserveY;
+          var amount = parseFloat(swapAmount.value) || 0;
+          var tokenXName = (tokenXNameInput.value || '').trim() || 'Token X';
+          var tokenYName = (tokenYNameInput.value || '').trim() || 'Token Y';
+
+          kValue.textContent = K.toLocaleString();
+
+          var newX, newY, sent, received, spot, exec, impact;
+          if (direction === 'x-to-y') {
+            sent = amount;
+            newX = reserveX + sent;
+            newY = K / newX;
+            received = reserveY - newY;
+            spot = reserveY / reserveX;
+            exec = sent > 0 ? received / sent : spot;
+            impact = ((exec - spot) / spot) * 100;
+          } else {
+            sent = amount;
+            newY = reserveY + sent;
+            newX = K / newY;
+            received = reserveX - newX;
+            spot = reserveX / reserveY;
+            exec = sent > 0 ? received / sent : spot;
+            impact = ((exec - spot) / spot) * 100;
+          }
+
+          var inToken = direction === 'x-to-y' ? tokenXName : tokenYName;
+          var outToken = direction === 'x-to-y' ? tokenYName : tokenXName;
+
+          swapToken.textContent = inToken;
+          sendAmount.textContent = formatNum(sent) + ' ' + inToken;
+          receiveAmount.textContent = sent > 0 ? (formatNum(received) + ' ' + outToken) : ('— ' + outToken);
+          spotPrice.textContent = '1 ' + inToken + ' = ' + spot.toFixed(4) + ' ' + outToken;
+          execPrice.textContent = sent > 0 ? ('1 ' + inToken + ' = ' + exec.toFixed(4) + ' ' + outToken) : '—';
+          priceImpact.textContent = sent > 0 ? ((impact > 0 ? '+' : '') + impact.toFixed(2) + '%') : '—';
+          impactStat.classList.toggle('negative', Math.abs(impact) > 1);
+
+          dirXtoY.textContent = 'Swap ' + tokenXName + ' → ' + tokenYName;
+          dirYtoX.textContent = 'Swap ' + tokenYName + ' → ' + tokenXName;
+
+          drawCurve(reserveX, reserveY, newX, newY, K);
+        }
+
+        reserveXInput.addEventListener('input', update);
+        reserveYInput.addEventListener('input', update);
+        tokenXNameInput.addEventListener('input', update);
+        tokenYNameInput.addEventListener('input', update);
+        swapAmount.addEventListener('input', update);
+
+        dirXtoY.addEventListener('click', function () {
+          direction = 'x-to-y';
+          dirXtoY.classList.add('active');
+          dirYtoX.classList.remove('active');
+          update();
+        });
+        dirYtoX.addEventListener('click', function () {
+          direction = 'y-to-x';
+          dirYtoX.classList.add('active');
+          dirXtoY.classList.remove('active');
+          update();
+        });
+
+        window.addEventListener('resize', function () {
+          requestAnimationFrame(update);
+        });
+
+        update();
+        return { update: update };
+      }
+    })();
+  </script>
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>

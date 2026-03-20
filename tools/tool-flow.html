@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — Flow Terminal</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+      --accent: #7df0ff;
+      --accent-rgb: 125 240 255;
+      --accent2: #ffc56d;
+      --accent2-rgb: 255 197 109;
+      --hot: 0 255 106;
+      --cyan: #5de8d0;
+      --danger: #ff5d5d;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Mono", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, monospace;
+      color: var(--cyan);
+      background: var(--bg);
+      overflow: hidden;
+    }
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.02) contrast(1.02);
+    }
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.30));
+      pointer-events: none;
+    }
+    .spot {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+          rgb(var(--accent-rgb) / 0.18),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: calc(0.95 * var(--spot-ready, 0));
+    }
+    body.in-shell .spot { opacity: 0 !important; }
+
+    /* CRT effect overlay */
+    .crt::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.15) 0px,
+          rgba(0, 0, 0, 0.15) 1px,
+          transparent 1px,
+          transparent 2px
+        );
+      pointer-events: none;
+      z-index: 10;
+    }
+    .crt::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.4) 100%);
+      pointer-events: none;
+      z-index: 11;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .terminal-screen {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(90vw, 900px);
+      height: min(85vh, 600px);
+      background: rgba(6, 14, 20, 0.95);
+      border: 1px solid rgba(93, 232, 208, 0.25);
+      border-radius: 8px;
+      box-shadow:
+        0 0 40px rgba(93, 232, 208, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .terminal-header {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid rgba(93, 232, 208, 0.15);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+    }
+    .terminal-header .status {
+      display: flex;
+      gap: 1.5rem;
+    }
+    .terminal-header .status span {
+      color: var(--cyan);
+      opacity: 0.7;
+    }
+    .terminal-header .status span.active {
+      opacity: 1;
+      text-shadow: 0 0 8px rgba(93, 232, 208, 0.5);
+    }
+    .terminal-header .status span.danger {
+      color: var(--danger);
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    .terminal-header .close-btn {
+      width: 1.4rem;
+      height: 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 0.75rem;
+      color: var(--cyan);
+      text-decoration: none;
+      font-size: 1.1rem;
+      line-height: 1;
+      opacity: 0.6;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .terminal-header .close-btn:hover {
+      opacity: 1;
+      background: rgba(255, 93, 93, 0.15);
+      border-color: rgba(255, 93, 93, 0.4);
+      color: var(--danger);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .terminal-body {
+      flex: 1;
+      padding: 1rem;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .setup-panel {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    .setup-panel h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 20px rgba(93, 232, 208, 0.3);
+    }
+    .setup-group {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .setup-group.modes {
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: flex-start;
+    }
+    .setup-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    .setup-field label {
+      font-size: 0.7rem;
+      opacity: 0.7;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .setup-field input[type="number"] {
+      width: 80px;
+      background: rgba(93, 232, 208, 0.08);
+      border: 1px solid rgba(93, 232, 208, 0.25);
+      border-radius: 4px;
+      padding: 0.4rem;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 1rem;
+      text-align: center;
+    }
+    .setup-field input[type="number"]:focus {
+      outline: none;
+      border-color: rgba(93, 232, 208, 0.5);
+      box-shadow: 0 0 10px rgba(93, 232, 208, 0.15);
+    }
+
+    .mode-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.75rem;
+      opacity: 0.8;
+      transition: opacity 0.15s;
+    }
+    .mode-toggle:hover { opacity: 1; }
+    .mode-toggle input { display: none; }
+    .mode-toggle .check {
+      width: 14px;
+      height: 14px;
+      border: 1px solid rgba(93, 232, 208, 0.4);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mode-toggle input:checked + .check {
+      background: rgba(93, 232, 208, 0.2);
+      border-color: rgba(93, 232, 208, 0.6);
+    }
+    .mode-toggle input:checked + .check::after {
+      content: '✓';
+      font-size: 10px;
+    }
+
+    .btn-start {
+      padding: 0.7rem 2rem;
+      background: rgba(93, 232, 208, 0.12);
+      border: 1px solid rgba(93, 232, 208, 0.4);
+      border-radius: 6px;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 0.9rem;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-transform: uppercase;
+    }
+    .btn-start:hover {
+      background: rgba(93, 232, 208, 0.2);
+      box-shadow: 0 0 20px rgba(93, 232, 208, 0.2);
+    }
+
+    .writing-area {
+      display: none;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      border: none;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 1rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+    }
+    .writing-area.invisible {
+      color: transparent;
+      text-shadow: none;
+    }
+
+    .result-panel {
+      display: none;
+      height: 100%;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 1.5rem;
+      text-align: center;
+    }
+    .result-panel h2 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 400;
+      opacity: 0.9;
+    }
+    .result-stats {
+      display: flex;
+      gap: 2rem;
+      font-size: 0.9rem;
+    }
+    .result-stats span {
+      opacity: 0.7;
+    }
+    .result-stats strong {
+      color: var(--cyan);
+      font-size: 1.3rem;
+    }
+    .result-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn-action {
+      padding: 0.5rem 1rem;
+      background: rgba(93, 232, 208, 0.08);
+      border: 1px solid rgba(93, 232, 208, 0.3);
+      border-radius: 4px;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-action:hover {
+      background: rgba(93, 232, 208, 0.15);
+      border-color: rgba(93, 232, 208, 0.5);
+    }
+
+    .timeout-warning {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 2rem;
+      background: rgba(255, 93, 93, 0.1);
+      border: 1px solid rgba(255, 93, 93, 0.4);
+      border-radius: 8px;
+      text-align: center;
+      animation: glitch 0.3s ease-in-out;
+    }
+    @keyframes glitch {
+      0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+      20% { transform: translate(-50%, -50%) translateX(-2px); }
+      40% { transform: translate(-50%, -50%) translateX(2px); }
+      60% { transform: translate(-50%, -50%) translateX(-1px); }
+      80% { transform: translate(-50%, -50%) translateX(1px); }
+    }
+    .timeout-warning h3 {
+      margin: 0 0 0.5rem;
+      color: var(--danger);
+    }
+    .timeout-warning p {
+      margin: 0;
+      font-size: 0.8rem;
+      opacity: 0.8;
+    }
+
+    .progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+      transition: width 1s linear;
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    body:not(.in-shell) .standalone-exit { display: inline-block; }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+
+    .back-hotspot {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .back-hotspot a {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .back-hotspot rect {
+      fill: rgb(var(--hot) / 0.02);
+      stroke: transparent;
+      stroke-width: 6px;
+      vector-effect: non-scaling-stroke;
+      transition: fill 0.15s;
+    }
+    .back-hotspot a:hover rect {
+      fill: rgb(var(--hot) / 0.07);
+      stroke: transparent;
+    }
+    .back-hotspot a:focus-visible rect {
+      fill: rgb(var(--hot) / 0.10);
+      stroke: rgb(var(--hot) / 0.90);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg { transform: none; }
+      .terminal-screen { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <script>if (window.self !== window.top) document.body.classList.add('in-shell');</script>
+  <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+
+  <main class="scene">
+    <svg class="back-hotspot" viewBox="0 0 1376 768" preserveAspectRatio="xMidYMid slice" aria-label="Back to workshop">
+      <a href="../places/workshop.html" aria-label="Back to Workshop">
+        <rect x="0" y="0" width="1376" height="100" rx="0" ry="0"></rect>
+      </a>
+    </svg>
+    <img class="bg" src="../pics/workshop-room.jpg" alt="Cyberpunk workshop with CRT monitors.">
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot" aria-hidden="true"></div>
+
+    <div class="overlay crt">
+      <div class="terminal-screen">
+        <div class="terminal-header">
+          <span>FLOW_TERMINAL_v1.0</span>
+          <div style="display: flex; align-items: center;">
+            <div class="status">
+              <span id="timer-display">--:--</span>
+              <span id="timeout-display">--s</span>
+            </div>
+            <a href="../places/workshop.html" class="close-btn" aria-label="Close terminal" title="Close">×</a>
+          </div>
+        </div>
+        <div class="terminal-body">
+          <div class="setup-panel" id="setup">
+            <h1>Write like you're running out of time</h1>
+            <div class="setup-group">
+              <div class="setup-field">
+                <label>Session (min)</label>
+                <input type="number" id="session-min" value="5" min="1" max="60">
+              </div>
+              <div class="setup-field">
+                <label>Timeout (sec)</label>
+                <input type="number" id="timeout-sec" value="5" min="1" max="30">
+              </div>
+            </div>
+            <div class="setup-group modes">
+              <label class="mode-toggle">
+                <input type="checkbox" id="soft-mode">
+                <span class="check"></span>
+                <span>Soft mode — erase last paragraph only</span>
+              </label>
+              <label class="mode-toggle">
+                <input type="checkbox" id="invisible-mode">
+                <span class="check"></span>
+                <span>Invisible mode — hide text while writing</span>
+              </label>
+              <label class="mode-toggle">
+                <input type="checkbox" id="zen-mode">
+                <span class="check"></span>
+                <span>Zen mode — hide timers</span>
+              </label>
+            </div>
+            <button class="btn-start" id="btn-start">Initialize</button>
+          </div>
+
+          <textarea class="writing-area" id="writing-area" placeholder="Start typing..." spellcheck="false"></textarea>
+
+          <div class="result-panel" id="result">
+            <h2>Session complete. Your words survived.</h2>
+            <div class="result-stats">
+              <span><strong id="word-count">0</strong> words</span>
+              <span><strong id="char-count">0</strong> characters</span>
+            </div>
+            <div class="result-actions">
+              <button class="btn-action" id="btn-copy">Copy text</button>
+              <button class="btn-action" id="btn-download">Download .txt</button>
+              <button class="btn-action" id="btn-restart">New session</button>
+            </div>
+          </div>
+
+          <div class="timeout-warning" id="timeout-warning">
+            <h3>⚠ CONNECTION LOST</h3>
+            <p id="timeout-message">Text has been erased.</p>
+          </div>
+
+          <div class="progress-bar" id="progress-bar"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function() {
+      const setup = document.getElementById('setup');
+      const writingArea = document.getElementById('writing-area');
+      const result = document.getElementById('result');
+      const btnStart = document.getElementById('btn-start');
+      const btnCopy = document.getElementById('btn-copy');
+      const btnDownload = document.getElementById('btn-download');
+      const btnRestart = document.getElementById('btn-restart');
+      const timerDisplay = document.getElementById('timer-display');
+      const timeoutDisplay = document.getElementById('timeout-display');
+      const timeoutWarning = document.getElementById('timeout-warning');
+      const timeoutMessage = document.getElementById('timeout-message');
+      const progressBar = document.getElementById('progress-bar');
+      const sessionMin = document.getElementById('session-min');
+      const timeoutSec = document.getElementById('timeout-sec');
+      const softMode = document.getElementById('soft-mode');
+      const invisibleMode = document.getElementById('invisible-mode');
+      const zenMode = document.getElementById('zen-mode');
+
+      let sessionDuration = 5 * 60 * 1000;
+      let timeoutDuration = 5 * 1000;
+      let sessionTimer = null;
+      let timeoutTimer = null;
+      let lastActivity = Date.now();
+      let isRunning = false;
+
+      function formatTime(ms) {
+        const totalSec = Math.ceil(ms / 1000);
+        const min = Math.floor(totalSec / 60);
+        const sec = totalSec % 60;
+        return `${min}:${sec.toString().padStart(2, '0')}`;
+      }
+
+      function startSession() {
+        sessionDuration = parseInt(sessionMin.value) * 60 * 1000;
+        timeoutDuration = parseInt(timeoutSec.value) * 1000;
+        const isInvisible = invisibleMode.checked;
+        const isZen = zenMode.checked;
+
+        setup.style.display = 'none';
+        writingArea.style.display = 'block';
+        writingArea.classList.toggle('invisible', isInvisible);
+        writingArea.focus();
+        isRunning = true;
+        lastActivity = Date.now();
+
+        if (isZen) {
+          timerDisplay.style.visibility = 'hidden';
+          timeoutDisplay.style.visibility = 'hidden';
+        } else {
+          timerDisplay.style.visibility = 'visible';
+          timeoutDisplay.style.visibility = 'visible';
+        }
+
+        updateDisplays();
+
+        sessionTimer = setInterval(() => {
+          const elapsed = Date.now() - lastActivity + (parseInt(sessionMin.value) * 60 * 1000 - sessionDuration);
+          sessionDuration -= 1000;
+          updateDisplays();
+          updateProgress();
+
+          if (sessionDuration <= 0) {
+            endSession(true);
+          }
+
+          const inactive = Date.now() - lastActivity;
+          if (inactive >= timeoutDuration && isRunning) {
+            triggerTimeout();
+          }
+        }, 1000);
+      }
+
+      function updateDisplays() {
+        timerDisplay.textContent = formatTime(Math.max(0, sessionDuration));
+        const inactive = Date.now() - lastActivity;
+        const remaining = Math.max(0, timeoutDuration - inactive);
+        timeoutDisplay.textContent = formatTime(remaining);
+
+        if (remaining < 2000) {
+          timeoutDisplay.classList.add('danger');
+        } else {
+          timeoutDisplay.classList.remove('danger');
+        }
+      }
+
+      function updateProgress() {
+        const total = parseInt(sessionMin.value) * 60 * 1000;
+        const progress = ((total - sessionDuration) / total) * 100;
+        progressBar.style.width = `${progress}%`;
+      }
+
+      function triggerTimeout() {
+        if (softMode.checked) {
+          const text = writingArea.value;
+          const lastBreak = text.lastIndexOf('\n\n');
+          if (lastBreak > 0) {
+            writingArea.value = text.substring(0, lastBreak);
+            timeoutMessage.textContent = 'Last paragraph erased. Keep writing.';
+          } else {
+            writingArea.value = '';
+            timeoutMessage.textContent = 'All text erased. Keep writing.';
+          }
+        } else {
+          writingArea.value = '';
+          timeoutMessage.textContent = 'All text erased due to inactivity.';
+        }
+
+        timeoutWarning.style.display = 'block';
+        setTimeout(() => {
+          timeoutWarning.style.display = 'none';
+        }, 2000);
+
+        lastActivity = Date.now();
+      }
+
+      function endSession(completed) {
+        isRunning = false;
+        clearInterval(sessionTimer);
+        writingArea.style.display = 'none';
+        result.style.display = 'flex';
+        progressBar.style.width = '100%';
+
+        const text = writingArea.value;
+        const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+        const chars = text.length;
+
+        document.getElementById('word-count').textContent = words;
+        document.getElementById('char-count').textContent = chars;
+
+        if (completed) {
+          timerDisplay.textContent = 'DONE';
+          timerDisplay.classList.add('active');
+        }
+      }
+
+      function copyText() {
+        navigator.clipboard.writeText(writingArea.value).then(() => {
+          btnCopy.textContent = 'Copied!';
+          setTimeout(() => btnCopy.textContent = 'Copy text', 1500);
+        });
+      }
+
+      function downloadText() {
+        const blob = new Blob([writingArea.value], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `flow-${new Date().toISOString().slice(0,10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function reset() {
+        writingArea.value = '';
+        result.style.display = 'none';
+        setup.style.display = 'flex';
+        timerDisplay.textContent = '--:--';
+        timeoutDisplay.textContent = '--s';
+        timerDisplay.classList.remove('active');
+        timerDisplay.style.visibility = 'visible';
+        timeoutDisplay.style.visibility = 'visible';
+        timeoutDisplay.classList.remove('danger');
+        progressBar.style.width = '0';
+      }
+
+      writingArea.addEventListener('input', () => {
+        lastActivity = Date.now();
+        if (invisibleMode.checked && isRunning) {
+          writingArea.classList.add('invisible');
+        }
+      });
+
+      writingArea.addEventListener('keydown', () => {
+        lastActivity = Date.now();
+      });
+
+      btnStart.addEventListener('click', startSession);
+      btnCopy.addEventListener('click', copyText);
+      btnDownload.addEventListener('click', downloadText);
+      btnRestart.addEventListener('click', reset);
+
+      // Spot effect
+      const root = document.documentElement;
+      let raf = 0, lastX = 0, lastY = 0;
+      function onPointerMove(e) {
+        if (e.pointerType === 'touch') return;
+        lastX = e.clientX; lastY = e.clientY;
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          root.style.setProperty('--spot-x', lastX + 'px');
+          root.style.setProperty('--spot-y', lastY + 'px');
+          root.style.setProperty('--spot-ready', '1');
+        });
+      }
+      window.addEventListener('pointermove', onPointerMove, { passive: true });
+    })();
+  </script>
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — Library</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+
+      --accent: #7df0ff;
+      --accent-rgb: 125 240 255;
+
+      --spot-x: 70%;
+      --spot-y: 10%;
+      --spot-alpha: 0.18;
+      --hot: 0 255 106;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.02) contrast(1.02);
+    }
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.30));
+      pointer-events: none;
+    }
+    .spot {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x) var(--spot-y),
+          rgb(var(--accent-rgb) / var(--spot-alpha)),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: calc(0.95 * var(--spot-ready, 0));
+    }
+    body.in-shell .spot { opacity: 0 !important; }
+
+    .hotspots {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .hotspots a { cursor: pointer; }
+    .hotspots rect {
+      fill: rgb(var(--hot) / 0.02);
+      stroke: transparent;
+      stroke-width: 6px;
+      vector-effect: non-scaling-stroke;
+    }
+    .hotspots a:hover rect {
+      fill: rgb(var(--hot) / 0.07);
+      stroke: transparent;
+    }
+    .hotspots a:focus-visible rect {
+      fill: rgb(var(--hot) / 0.10);
+      stroke: rgb(var(--hot) / 0.90);
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    body:not(.in-shell) .standalone-exit {
+      display: inline-block;
+    }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+    .standalone-exit:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.45);
+      outline-offset: 3px;
+    }
+  </style>
+</head>
+<body>
+  <main class="scene">
+    <img class="bg" src="../pics/library-room.jpg" alt="Retro-futuristic library interior with a doorway and a terminal.">
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot" aria-hidden="true"></div>
+
+    <svg class="hotspots" viewBox="0 0 1376 768" preserveAspectRatio="xMidYMid slice" aria-label="Library hotspots">
+      <a href="street.html" aria-label="Back to street">
+        <rect x="130" y="250" width="220" height="250" rx="14" ry="14"></rect>
+      </a>
+      <a href="book.html" aria-label="Book">
+        <rect x="550" y="300" width="200" height="200" rx="14" ry="14"></rect>
+      </a>
+      <a href="terminal.html" aria-label="Terminal">
+        <rect x="1010" y="175" width="325" height="540" rx="14" ry="14"></rect>
+      </a>
+      <a href="tablet.html" aria-label="Tablet — The Time Machine">
+        <rect x="360" y="300" width="200" height="200" rx="14" ry="14"></rect>
+      </a>
+    </svg>
+
+    <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+  </main>
+
+  <script src="../js/scene-common.js"></script>
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>

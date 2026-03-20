@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml">
+  <link rel="shortcut icon" href="favicon.svg?v=2" type="image/svg+xml">
+  <title>City</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+
+      --accent-rgb: 125 240 255;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    .frame {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: var(--bg);
+    }
+
+    .spot-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 0.5;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x, 50%) var(--spot-y, 45%),
+          rgb(var(--accent-rgb) / 0.18),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    body.spot-on .spot-overlay {
+      opacity: 1;
+    }
+
+    .chrome {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      pointer-events: none;
+    }
+    .chrome > * { pointer-events: auto; }
+
+    .chrome .controls {
+      display: flex;
+      gap: 0.35rem;
+      align-items: center;
+      padding: 0.3rem 0.4rem;
+      border: 1px solid rgb(var(--accent-rgb) / 0.25);
+      border-radius: 12px;
+      background: rgb(6 12 18 / 0.35);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow:
+        0 0 20px rgb(var(--accent-rgb) / 0.06),
+        inset 0 1px 0 rgb(255 255 255 / 0.04);
+    }
+    .chrome .controls a,
+    .chrome .controls button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.5rem;
+      min-height: 2.5rem;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: rgb(255 255 255 / 0.03);
+      font-size: 1.25rem;
+      line-height: 1;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      font-family: inherit;
+    }
+    .chrome .controls a {
+      color: var(--text-muted);
+    }
+    .chrome .controls button {
+      color: var(--text-muted);
+    }
+    .chrome .controls a:hover,
+    .chrome .controls button:hover {
+      background: rgb(var(--accent-rgb) / 0.08);
+      border-color: rgb(var(--accent-rgb) / 0.4);
+      box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.15);
+    }
+    .chrome .controls a:focus-visible,
+    .chrome .controls button:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.5);
+      outline-offset: 2px;
+    }
+    .chrome .controls button.spot-on,
+    .chrome .controls button.music-on,
+    .chrome .controls .music-menu summary.music-on {
+      background: rgb(var(--accent-rgb) / 0.12);
+      border-color: rgb(var(--accent-rgb) / 0.45);
+      box-shadow: 0 0 14px rgb(var(--accent-rgb) / 0.2);
+    }
+
+    .chrome .controls .links {
+      display: flex;
+      align-items: center;
+      position: relative;
+      border: none;
+      background: transparent;
+      padding: 0;
+      margin: 0;
+      max-width: none;
+    }
+    .chrome .controls .links summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.5rem;
+      min-height: 2.5rem;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: rgb(255 255 255 / 0.03);
+      font-size: 1.25rem;
+      line-height: 1;
+      color: var(--text-muted);
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+    .chrome .controls .links summary::-webkit-details-marker,
+    .chrome .controls .links summary::marker { display: none; }
+    .chrome .controls .links summary::before {
+      content: "🗺️";
+      font-size: 1.1rem;
+    }
+    .chrome .controls .links summary:hover {
+      background: rgb(var(--accent-rgb) / 0.08);
+      border-color: rgb(var(--accent-rgb) / 0.4);
+      box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.15);
+    }
+    .chrome .controls .links summary:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.5);
+      outline-offset: 2px;
+    }
+    .chrome .controls .links[open] summary {
+      background: rgb(var(--accent-rgb) / 0.12);
+      border-color: rgb(var(--accent-rgb) / 0.45);
+      box-shadow: 0 0 14px rgb(var(--accent-rgb) / 0.2);
+    }
+    .chrome .controls .links .links-dropdown {
+      position: absolute;
+      bottom: 100%;
+      right: 0;
+      margin: 0 0 0.35rem 0;
+      padding: 0.4rem 0.6rem;
+      border-radius: 12px;
+      background: rgb(6 14 22 / 0.96);
+      border: 1px solid rgb(var(--accent-rgb) / 0.2);
+      box-shadow: 0 0 20px rgb(var(--accent-rgb) / 0.08);
+      min-width: 14rem;
+      max-width: 34rem;
+      max-height: 60vh;
+      overflow: auto;
+    }
+    .chrome .controls .links .links-dropdown p {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      margin: 0 0 0.25rem 0;
+    }
+    .chrome .controls .links .links-dropdown ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 0.35rem;
+    }
+    .chrome .controls .links a {
+      color: var(--text);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+    }
+    .chrome .controls .links a:hover {
+      color: rgb(var(--accent-rgb));
+      border-bottom-color: rgb(var(--accent-rgb) / 0.55);
+    }
+    .chrome .controls .links a:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.45);
+      outline-offset: 2px;
+      border-bottom-color: transparent;
+    }
+
+    .chrome .controls .music-menu {
+      position: relative;
+      border: none;
+      background: transparent;
+      padding: 0;
+      margin: 0;
+    }
+    .chrome .controls .music-menu summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.5rem;
+      min-height: 2.5rem;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: rgb(255 255 255 / 0.03);
+      font-size: 1.25rem;
+      line-height: 1;
+      color: var(--text-muted);
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+    .chrome .controls .music-menu .music-icon {
+      display: inline-block;
+      position: relative;
+    }
+    .chrome .controls .music-menu .music-icon.muted::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 140%;
+      height: 2px;
+      margin: -1px 0 0 -70%;
+      background: currentColor;
+      opacity: 0.85;
+      transform: rotate(-45deg);
+      pointer-events: none;
+    }
+    .chrome .controls .music-menu summary::-webkit-details-marker,
+    .chrome .controls .music-menu summary::marker { display: none; }
+    .chrome .controls .music-menu summary:hover {
+      background: rgb(var(--accent-rgb) / 0.08);
+      border-color: rgb(var(--accent-rgb) / 0.4);
+      box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.15);
+    }
+    .chrome .controls .music-menu summary:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.5);
+      outline-offset: 2px;
+    }
+    .chrome .controls .music-menu[open] summary {
+      background: rgb(var(--accent-rgb) / 0.12);
+      border-color: rgb(var(--accent-rgb) / 0.45);
+      box-shadow: 0 0 14px rgb(var(--accent-rgb) / 0.2);
+    }
+    .chrome .controls .music-menu .music-dropdown {
+      position: absolute;
+      bottom: 100%;
+      right: 0;
+      margin: 0 0 0.35rem 0;
+      padding: 0.5rem 0.6rem;
+      border-radius: 12px;
+      background: rgb(6 14 22 / 0.96);
+      border: 1px solid rgb(var(--accent-rgb) / 0.2);
+      box-shadow: 0 0 20px rgb(var(--accent-rgb) / 0.08);
+      min-width: 12rem;
+      max-width: 20rem;
+    }
+    .chrome .controls .music-menu .music-dropdown .music-actions {
+      display: flex;
+      gap: 0.35rem;
+      margin-bottom: 0.5rem;
+    }
+    .chrome .controls .music-menu .music-dropdown .music-actions button {
+      flex: 1;
+      min-width: 0;
+      font-size: 0.9rem;
+    }
+    .chrome .controls .music-menu .music-dropdown p {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin: 0 0 0.35rem 0;
+    }
+    .chrome .controls .music-menu .music-dropdown ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      max-height: 40vh;
+      overflow: auto;
+    }
+    .chrome .controls .music-menu .music-dropdown li {
+      margin: 0;
+    }
+    .chrome .controls .music-menu .music-dropdown li button {
+      width: 100%;
+      justify-content: flex-start;
+      min-height: 2.2rem;
+      padding: 0 0.5rem;
+      font-size: 0.85rem;
+      font-weight: normal;
+      text-align: left;
+    }
+    .chrome .controls .music-menu .music-dropdown li button.active {
+      background: rgb(var(--accent-rgb) / 0.15);
+      border-color: rgb(var(--accent-rgb) / 0.5);
+      color: var(--text);
+    }
+
+    /* Rotate-to-landscape overlay: only on narrow portrait */
+    .rotate-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      background: rgb(7 11 16 / 0.92);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 2rem;
+      text-align: center;
+    }
+    @media (orientation: portrait) and (max-width: 768px) {
+      .rotate-overlay { display: flex; }
+    }
+    @media (orientation: portrait) and (max-height: 500px) {
+      .rotate-overlay { display: flex; }
+    }
+    .rotate-overlay .icon {
+      font-size: 3rem;
+      opacity: 0.9;
+    }
+    .rotate-overlay p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 1rem;
+      max-width: 18em;
+    }
+
+    /* Fullscreen button: show on touch-capable / small viewport */
+    .chrome .controls .fullscreen-btn { display: none; }
+    @media (max-width: 768px), (max-height: 500px), (pointer: coarse) {
+      .chrome .controls .fullscreen-btn { display: flex; }
+    }
+
+    .video-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      background: #000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .video-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .video-overlay video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="rotate-overlay" id="rotate-overlay" aria-hidden="true" role="presentation">
+    <span class="icon" aria-hidden="true">📱↻</span>
+    <p>Rotate your device to landscape for a better view.</p>
+  </div>
+  <div class="chrome" role="region" aria-label="City navigation">
+    <div class="controls" role="group" aria-label="City controls">
+      <button type="button" id="fullscreen-toggle" class="fullscreen-btn" aria-label="Fullscreen" title="Fullscreen">⛶</button>
+      <button type="button" id="spot-toggle" aria-pressed="false" aria-label="Toggle flashlight" title="Flashlight">🔦</button>
+      <details class="music-menu" id="music-menu">
+        <summary id="music-toggle" aria-label="Music" title="Music"><span class="music-icon" aria-hidden="true">🎵</span></summary>
+        <div class="music-dropdown">
+          <div class="music-actions">
+            <button type="button" id="music-play-pause" aria-label="Play / Pause">▶ Play</button>
+            <button type="button" id="music-stop" aria-label="Stop">⏹ Stop</button>
+          </div>
+          <p id="music-playlist-desc">Tracks by Moby</p>
+          <ul id="music-playlist"></ul>
+        </div>
+      </details>
+      <details class="links" id="shell-links">
+        <summary aria-label="Doors / Scene links"></summary>
+        <div class="links-dropdown">
+          <p id="shell-links-desc">Doors and signs in this scene.</p>
+          <ul id="shell-links-list"></ul>
+        </div>
+      </details>
+    </div>
+  </div>
+  <iframe class="frame" id="city-frame" src="places/entry.html" title="City"></iframe>
+  <div class="spot-overlay" id="spot-overlay" aria-hidden="true"></div>
+  <div class="video-overlay" id="video-overlay" aria-hidden="true">
+    <video id="transition-video" preload="auto" muted playsinline src="pics/entry-transition.mp4"></video>
+  </div>
+
+  <script src="js/audio.js"></script>
+  <script src="js/nav-data.js"></script>
+  <script>
+    (function () {
+      var root = document.documentElement;
+      root.dataset.theme = 'dark';
+
+      var frame = document.getElementById('city-frame');
+      if (!frame) return;
+
+      var currentSceneFile = 'entry.html';
+      var dynamicLinks = Object.create(null);
+
+      function normalizeScenePath(path) {
+        if (!path) return path;
+        if (/^(https?:|data:|blob:|javascript:)/i.test(path)) return '';
+        while (path.indexOf('../') === 0) path = path.slice(3);
+        if (path.indexOf('..') !== -1) return '';
+        if (path.indexOf('/') !== -1) {
+          if (path.indexOf('places/') === 0 || path.indexOf('tools/') === 0 || path.indexOf('posts/') === 0) return path;
+          return '';
+        }
+        if (!/\.html($|\?)/i.test(path)) return '';
+        if (path === 'index.html') return path;
+        return 'places/' + path;
+      }
+
+      function setScene(path) {
+        var normalized = normalizeScenePath(path);
+        if (!normalized) return;
+        currentSceneFile = normalized.split('?')[0].split('/').pop() || normalized;
+        updateDoorsList(currentSceneFile);
+        frame.src = normalized;
+      }
+
+      var params = new URLSearchParams(window.location.search);
+      var requested = params.get('scene') || params.get('s') || '';
+      if (requested) setScene(requested);
+      if (window.location.hash && window.location.hash.length > 1) {
+        setScene(window.location.hash.slice(1));
+      }
+
+      var FALLBACK_LINKS = (window.CITY_NAV && window.CITY_NAV.doors) ? window.CITY_NAV.doors : Object.create(null);
+
+      function addLinkToList(list, item) {
+        var li = document.createElement('li');
+        var newA = document.createElement('a');
+        var href = item.href || '';
+        newA.textContent = item.text || href;
+        newA.setAttribute('href', href);
+        if (item.external || /^https?:/i.test(href)) {
+          newA.setAttribute('target', '_blank');
+          newA.setAttribute('rel', 'noopener');
+        } else {
+          newA.addEventListener('click', function (e) {
+            var targetHref = this.getAttribute('href');
+            if (targetHref && !/^https?:/i.test(targetHref)) {
+              e.preventDefault();
+              setScene(targetHref);
+            }
+          });
+        }
+        li.appendChild(newA);
+        list.appendChild(li);
+      }
+
+      function updateDoorsList(file) {
+        var list = document.getElementById('shell-links-list');
+        if (!list) return;
+        list.innerHTML = '';
+        var items = dynamicLinks[file] && dynamicLinks[file].length ? dynamicLinks[file] : FALLBACK_LINKS[file];
+        if (items) {
+          for (var i = 0; i < items.length; i++) addLinkToList(list, items[i]);
+        }
+      }
+
+      window.addEventListener('message', function (e) {
+        if (!e || !e.data || e.data.type !== 'city:scene') return;
+        var file = e.data.file;
+        if (file && typeof file === 'string') {
+          currentSceneFile = file.split('?')[0].split('/').pop() || file;
+          updateDoorsList(currentSceneFile);
+        }
+      });
+
+      window.addEventListener('message', function (e) {
+        if (!e || !e.data || e.data.type !== 'city:links') return;
+        var file = e.data.file;
+        var links = e.data.links;
+        if (!file || typeof file !== 'string') return;
+        if (!Array.isArray(links)) return;
+        dynamicLinks[file] = links;
+        if ((file.split('?')[0].split('/').pop() || file) === currentSceneFile) {
+          updateDoorsList(currentSceneFile);
+        }
+      });
+
+      updateDoorsList(currentSceneFile);
+
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var spotKey = 'city-flashlight';
+      var spotToggle = document.getElementById('spot-toggle');
+      var spotOverlay = document.getElementById('spot-overlay');
+      var raf = 0;
+      var lastX = window.innerWidth / 2;
+      var lastY = window.innerHeight / 2;
+
+      function isSpotOn() {
+        try { return localStorage.getItem(spotKey) === 'on'; } catch (e) { return false; }
+      }
+      function setSpotOn(on) {
+        try { localStorage.setItem(spotKey, on ? 'on' : 'off'); } catch (e) {}
+        document.body.classList.toggle('spot-on', on);
+        if (spotToggle) {
+          spotToggle.classList.toggle('spot-on', on);
+          spotToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+        }
+        try {
+          if (frame && frame.contentWindow) {
+            frame.contentWindow.postMessage({ type: 'city:spot-state', on: !!on }, '*');
+          }
+        } catch (e) {}
+        if (on) {
+          root.style.setProperty('--spot-x', lastX + 'px');
+          root.style.setProperty('--spot-y', lastY + 'px');
+          if (!reduceMotion) document.addEventListener('pointermove', onSpotPointerMove, { passive: true });
+        } else {
+          document.removeEventListener('pointermove', onSpotPointerMove);
+        }
+      }
+      function onSpotPointerMove(e) {
+        if (e.pointerType === 'touch') return;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (raf) return;
+        raf = window.requestAnimationFrame(function () {
+          raf = 0;
+          root.style.setProperty('--spot-x', lastX + 'px');
+          root.style.setProperty('--spot-y', lastY + 'px');
+        });
+      }
+      function setSpotPosition(x, y) {
+        lastX = x;
+        lastY = y;
+        root.style.setProperty('--spot-x', lastX + 'px');
+        root.style.setProperty('--spot-y', lastY + 'px');
+      }
+
+      window.addEventListener('message', function (e) {
+        if (!e || !e.data || e.data.type !== 'city-spot-move') return;
+        var x = e.data.x;
+        var y = e.data.y;
+        if (typeof x !== 'number' || typeof y !== 'number') return;
+        if (!document.body.classList.contains('spot-on')) return;
+        setSpotPosition(x, y);
+      }, { passive: true });
+
+      if (spotToggle) {
+        spotToggle.addEventListener('click', function () {
+          setSpotOn(!isSpotOn());
+        });
+      }
+      if (isSpotOn()) {
+        setSpotOn(true);
+      }
+
+      var musicMenu = document.getElementById('music-menu');
+      var musicToggle = document.getElementById('music-toggle');
+      var musicPlayPause = document.getElementById('music-play-pause');
+      var musicStop = document.getElementById('music-stop');
+      var musicPlaylist = document.getElementById('music-playlist');
+      if (musicMenu && musicToggle) {
+        function updateMusicSummary() {
+          var api = window.__CITY_AUDIO_API__;
+          var on = api && api.getEnabled && api.getEnabled();
+          musicToggle.classList.toggle('music-on', !!on);
+          musicToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+          var icon = musicToggle.querySelector('.music-icon');
+          if (icon) icon.classList.toggle('muted', !on);
+          var name = api && api.getTrackName ? api.getTrackName() : '';
+          musicToggle.title = name ? 'Music — ' + name : 'Music';
+        }
+        function updateMusicDropdown() {
+          var api = window.__CITY_AUDIO_API__;
+          if (!api) return;
+          var enabled = api.getEnabled && api.getEnabled();
+          var paused = api.isPaused && api.isPaused();
+          var idx = api.getTrackIndex ? api.getTrackIndex() : 0;
+          if (musicPlayPause) {
+            musicPlayPause.textContent = (!enabled || paused) ? '▶ Play' : '⏸ Pause';
+            musicPlayPause.setAttribute('aria-label', (!enabled || paused) ? 'Play' : 'Pause');
+          }
+          if (musicPlaylist) {
+            var items = musicPlaylist.querySelectorAll('li button');
+            for (var i = 0; i < items.length; i++) {
+              items[i].classList.toggle('active', enabled && !paused && i === idx);
+            }
+          }
+        }
+        function fillPlaylist() {
+          if (!musicPlaylist) return;
+          var api = window.__CITY_AUDIO_API__;
+          var tracks = api && api.getTracks && api.getTracks();
+          if (!tracks || !tracks.length) return;
+          musicPlaylist.innerHTML = '';
+          for (var i = 0; i < tracks.length; i++) {
+            (function (index) {
+              var li = document.createElement('li');
+              var btn = document.createElement('button');
+              btn.type = 'button';
+              btn.textContent = tracks[index].name;
+              btn.setAttribute('aria-label', 'Play ' + tracks[index].name);
+              btn.addEventListener('click', function () {
+                if (api && api.playTrack) api.playTrack(index);
+                updateMusicSummary();
+                updateMusicDropdown();
+              });
+              li.appendChild(btn);
+              musicPlaylist.appendChild(li);
+            })(i);
+          }
+          updateMusicDropdown();
+        }
+        musicMenu.addEventListener('toggle', function () {
+          if (musicMenu.open) {
+            fillPlaylist();
+            updateMusicDropdown();
+          }
+        });
+        if (musicPlayPause) {
+          musicPlayPause.addEventListener('click', function () {
+            var api = window.__CITY_AUDIO_API__;
+            if (!api) return;
+            var enabled = api.getEnabled && api.getEnabled();
+            var paused = api.isPaused && api.isPaused();
+            if (!enabled || paused) {
+              if (!enabled && api.setEnabled) api.setEnabled(true);
+              else if (api.resume) api.resume();
+            } else if (api.pause) api.pause();
+            updateMusicSummary();
+            updateMusicDropdown();
+          });
+        }
+        if (musicStop) {
+          musicStop.addEventListener('click', function () {
+            var api = window.__CITY_AUDIO_API__;
+            if (api && api.stop) api.stop();
+            updateMusicSummary();
+            updateMusicDropdown();
+            if (musicMenu) musicMenu.open = false;
+          });
+        }
+        if (document.readyState === 'complete') {
+          updateMusicSummary();
+        } else {
+          document.addEventListener('DOMContentLoaded', updateMusicSummary, { once: true });
+        }
+        setInterval(updateMusicDropdown, 800);
+      }
+
+      var fullscreenToggle = document.getElementById('fullscreen-toggle');
+      if (fullscreenToggle) {
+        function isFullscreen() {
+          return !!(document.fullscreenElement || document.webkitFullscreenElement);
+        }
+        function updateFullscreenButton() {
+          var on = isFullscreen();
+          fullscreenToggle.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Fullscreen');
+          fullscreenToggle.setAttribute('title', on ? 'Exit fullscreen' : 'Fullscreen');
+          fullscreenToggle.textContent = on ? '✕' : '⛶';
+        }
+        function requestFullscreen() {
+          var el = document.documentElement;
+          if (el.requestFullscreen) el.requestFullscreen();
+          else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        }
+        function exitFullscreen() {
+          if (document.exitFullscreen) document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
+        fullscreenToggle.addEventListener('click', function () {
+          if (isFullscreen()) exitFullscreen();
+          else requestFullscreen();
+        });
+        document.addEventListener('fullscreenchange', updateFullscreenButton);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+        updateFullscreenButton();
+      }
+      var videoOverlay = document.getElementById('video-overlay');
+      var transVideo = document.getElementById('transition-video');
+      var transitioning = false;
+
+      var VIDEO_TRANSITIONS = (window.CITY_NAV && window.CITY_NAV.videoTransitions)
+        ? window.CITY_NAV.videoTransitions
+        : Object.create(null);
+
+      function playTransition(target) {
+        if (transitioning) return;
+        var entry = VIDEO_TRANSITIONS[currentSceneFile];
+        if (!entry || entry.to !== target) { setScene(target); return; }
+
+        transitioning = true;
+        videoOverlay.classList.add('active');
+
+        setTimeout(function () {
+          transVideo.currentTime = 0;
+          transVideo.play().then(function () {
+            transVideo.addEventListener('ended', function onEnd() {
+              transVideo.removeEventListener('ended', onEnd);
+              setScene(target);
+              setTimeout(function () {
+                videoOverlay.classList.remove('active');
+                transitioning = false;
+              }, 350);
+            });
+          }).catch(function () {
+            setScene(target);
+            videoOverlay.classList.remove('active');
+            transitioning = false;
+          });
+        }, 320);
+      }
+
+      window.addEventListener('message', function (e) {
+        if (!e || !e.data || e.data.type !== 'city:transition') return;
+        var to = e.data.to;
+        if (to && typeof to === 'string') playTransition(to);
+      });
+
+      frame.addEventListener('load', function () {
+        try {
+          if (frame && frame.contentWindow) {
+            frame.contentWindow.postMessage({ type: 'city:spot-state', on: isSpotOn() }, '*');
+          }
+        } catch (e) {}
+      });
+
+    })();
+  </script>
+</body>
+</html>

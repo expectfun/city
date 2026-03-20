@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — AI News Terminal</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+      --accent: #ff6ec7;
+      --accent-rgb: 255 110 199;
+      --accent2: #7df0ff;
+      --accent2-rgb: 125 240 255;
+      --hot: 125 240 255;
+      --cyan: #5de8d0;
+      --danger: #ff5d5d;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Mono", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, monospace;
+      color: var(--cyan);
+      background: var(--bg);
+      overflow: hidden;
+    }
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.02) contrast(1.02);
+    }
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.30));
+      pointer-events: none;
+    }
+    .spot {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+          rgb(var(--accent2-rgb) / 0.18),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: calc(0.95 * var(--spot-ready, 0));
+    }
+    body.in-shell .spot { opacity: 0 !important; }
+
+    .crt::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.15) 0px,
+          rgba(0, 0, 0, 0.15) 1px,
+          transparent 1px,
+          transparent 2px
+        );
+      pointer-events: none;
+      z-index: 10;
+    }
+    .crt::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.4) 100%);
+      pointer-events: none;
+      z-index: 11;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .terminal-screen {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(96vw, 1200px);
+      height: min(96vh, 820px);
+      background: rgba(6, 14, 20, 0.85);
+      border: 1px solid rgba(93, 232, 208, 0.25);
+      border-radius: 8px;
+      box-shadow:
+        0 0 40px rgba(93, 232, 208, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .terminal-header {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid rgba(93, 232, 208, 0.15);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+    .terminal-header span { opacity: 0.7; }
+    .terminal-header .close-btn {
+      width: 1.4rem;
+      height: 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 0.75rem;
+      color: var(--cyan);
+      text-decoration: none;
+      font-size: 1.1rem;
+      line-height: 1;
+      opacity: 0.6;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .terminal-header .close-btn:hover {
+      opacity: 1;
+      background: rgba(255, 93, 93, 0.15);
+      border-color: rgba(255, 93, 93, 0.4);
+      color: var(--danger);
+    }
+
+    .terminal-body {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      background: #0a0f14;
+    }
+
+    .news-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #0a0f14;
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    body:not(.in-shell) .standalone-exit {
+      display: inline-block;
+    }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent2-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent2-rgb) / 0.10);
+    }
+    .standalone-exit:focus-visible {
+      outline: 2px solid rgb(var(--accent2-rgb) / 0.45);
+      outline-offset: 3px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <script>if (window.self !== window.top) document.body.classList.add('in-shell');</script>
+  <main class="scene">
+    <img class="bg" src="../pics/cafe-interior.jpg" alt="Cyber café interior with AI News Terminal signage and multiple glowing screens.">
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot" aria-hidden="true"></div>
+
+    <div class="overlay crt">
+      <div class="terminal-screen">
+        <div class="terminal-header">
+          <span>AI NEWS TERMINAL // WEEKLY FEED</span>
+          <a href="../places/cafe.html" class="close-btn" aria-label="Close AI news">×</a>
+        </div>
+        <div class="terminal-body">
+          <iframe
+            class="news-frame"
+            src="https://shir-man.com/homepage/?sort=week&amp;view=feed"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+            title="AI News Terminal"
+          ></iframe>
+        </div>
+      </div>
+    </div>
+
+    <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+  </main>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      root.dataset.theme = 'dark';
+
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var raf = 0;
+      var lastX = 0;
+      var lastY = 0;
+      function onPointerMove(e) {
+        if (e.pointerType === 'touch') return;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (raf) return;
+        raf = window.requestAnimationFrame(function () {
+          raf = 0;
+          root.style.setProperty('--spot-x', lastX + 'px');
+          root.style.setProperty('--spot-y', lastY + 'px');
+          root.style.setProperty('--spot-ready', '1');
+        });
+      }
+      if (!reduceMotion) {
+        root.style.setProperty('--spot-ready', '0');
+        window.addEventListener('pointermove', onPointerMove, { passive: true });
+      }
+    })();
+  </script>
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>
+

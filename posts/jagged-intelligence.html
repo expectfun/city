@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jagged intelligence — Eugene Trifonov</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root, [data-theme="dark"] {
+      --bg: #0b1016;
+      --bg-alt: #0f1620;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.62);
+      --border: rgba(232, 238, 246, 0.14);
+      --shade: rgb(0 0 0 / 0.12);
+      --accent: #7df0ff;
+      --accent2: #ffc56d;
+      --accent-rgb: 125 240 255;
+      --accent2-rgb: 255 197 109;
+      --spot-x: 70%;
+      --spot-y: 0%;
+      --spot-alpha: 0.18;
+    }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: 1rem;
+      line-height: 1.7;
+      color: var(--text);
+      background:
+        radial-gradient(900px circle at var(--spot-x) var(--spot-y),
+          rgb(var(--accent-rgb) / var(--spot-alpha)),
+          transparent 60%),
+        radial-gradient(1100px circle at 12% 20%,
+          rgb(var(--accent2-rgb) / 0.10),
+          transparent 55%),
+        linear-gradient(180deg, transparent, var(--shade)),
+        var(--bg);
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+    }
+    .wrap { max-width: 42rem; margin: 0 auto; }
+    .meta { display: flex; gap: 1rem; margin-bottom: 2rem; font-size: 0.8rem; color: var(--text-muted); }
+    .back { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; }
+    .date { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 2rem; }
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 0.5rem; letter-spacing: -0.02em; }
+    h2 { font-size: 1.15rem; font-weight: 600; margin: 2rem 0 0.75rem; }
+    p { margin: 0 0 1rem; }
+    ul, ol { margin: 0 0 1rem; padding-left: 1.5rem; }
+    li { margin-bottom: 0.35rem; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+    blockquote { border-left: 1px solid rgb(var(--accent-rgb) / 0.45); color: var(--text-muted); padding-left: 1.25rem; margin: 1.25rem 0; font-style: italic; }
+    article img { max-width: 100%; height: auto; display: block; margin: 1.5rem 0; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="meta">
+      <a href="../index.html" class="back">← City</a>
+    </div>
+
+    <article>
+      <h1>Jagged intelligence</h1>
+      <p class="date"><i><time datetime="2026-01-07T21:10Z">07 Jan, 2026</time></i></p>
+
+      <p><img src="images/ji3.jpg" alt="Well, you can probably guess how that image was created">
+Sure, everyone and their bear is writing about AI now, making you sick of reading about it. But they usually don't know how to do it right. I do. My blog is the right one to read. (Well, there's a <a href="https://en.wikipedia.org/wiki/Overconfidence_effect" target="_blank" rel="noopener">reason</a> it's called Overconfidence Effect.) So unfortunately for you, here goes yet another blog series on AI. Bear with me.</p>
+
+      <p>Where to start? What's the most fundamental thing about AI that's not immediately obvious? I think the humanity is yet to fully grasp the concept of <strong>"jagged intelligence"</strong>.</p>
+
+      <p>Once upon a time, back when no one was talking about AI (well, Ray Kurzweil was, but nobody else), I was watching a robot vacuum cleaner doing its thing. And looking at its attempts to cover all the floor surface, I couldn't help but feel two things at once:</p>
+      <ul>
+        <li>"Wow, how smart it is!"</li>
+        <li>"Wow, how dumb it is!"</li>
+      </ul>
+      <p>It could move in pretty sophisticated ways, showing some kind of "understanding" of the environment... and right after that, it could get stuck in an "easily avoidable situation".</p>
+      <p>And now, more than a decade later, I'm watching the progress of AI with similar feelings. LLMs are very "smart". LLMs are very "dumb". Those two things are not contradictory.</p>
+
+      <hr>
+
+      <h2 id="binary-fallacy">Binary fallacy</h2>
+      <p>People tend to think in a binary way. Each thing is perceived as "good" or "bad", each innovation as "a revolution" or "a bubble". It's like we have just one bit of memory allocated to each of our verdicts. Well, that probably helped some cavemen escape tigers thousands of years ago and pass their genes to us. But I don't think that's a good way to reason about complicated things when we're not being chased by a tiger. And AI is complicated as hell.</p>
+      <p>So when people talk about the "intelligence capabilities" of AI, they often see it either as a <em>genius invention that will soon surpass us at everything</em>, or as a <em>useless hallucinating machine that's confidently spitting out pointless probabilities</em>. It's seen as <em>"smart"</em> or <em>"dumb"</em>, one bit.</p>
+      <p>In my opinion, both of these ways of thinking are flawed. What's the right one?</p>
+      <p>In his 2025 year-end review, Andrej Karpathy <a href="https://karpathy.bearblog.dev/year-in-review-2025/" target="_blank" rel="noopener">wrote</a> about "jagged intelligence" and shared this image. I think that's the best visual representation of modern AI capabilities (shown in red, growing) compared to the human capabilities (shown in blue).</p>
+      <p><img src="images/jagged-intelligence-diagram.webp" alt="a pic I shamelessly copied from Karpathy's post but he copied it too so it is okay"></p>
+
+      <hr>
+
+      <h2 id="what-do-we-see-here">What do we see here?</h2>
+      <ol>
+        <li><strong>AI is "jagged"</strong>. It shines in some regards (let's call those parts of the image "jaggies"), but it lacks just as much in others.</li>
+        <li><strong>Human intelligence is jagged too</strong>. We are excellent at some tasks and weak at others.</li>
+        <li><strong>AI is not simply "more" or "less" than humans</strong>. It's different.</li>
+        <li><strong>AI overtakes humans in specific tasks</strong>, while still lagging in others.</li>
+        <li><strong>AI capabilities are growing very fast</strong>, and hard to ignore.</li>
+        <li><strong>Jaggedness does not disappear while capabilities grow</strong>.</li>
+      </ol>
+
+      <hr>
+
+      <h2 id="whats-the-right-approach">What's the right approach?</h2>
+      <p>Stop thinking about AI as a monolithic thing that's either smart or dumb.</p>
+      <p>Start thinking in terms of jaggies and shortcomings — both for AI and for yourself.</p>
+      <p>Where do capabilities overlap? Where do they complement each other? Where are the risks?</p>
+
+      <hr>
+
+      <h2 id="an-example">An example</h2>
+      <p>I enjoy writing, and I think that's one of my jaggies.</p>
+      <p>I still use LLMs as a checker and as a "rubber duck" to reason better, not as a full replacement for writing.</p>
+      <p>That is the pattern: combine strengths, manage weaknesses.</p>
+
+      <hr>
+
+      <p>With the speed of change, we won't have the option to ignore this topic for long.</p>
+      <p>So bear with me. See you in the next post.</p>
+    </article>
+  </div>
+</body>
+</html>

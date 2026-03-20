@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — Tablet</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+      --accent: #7df0ff;
+      --accent-rgb: 125 240 255;
+      --spot-x: 50%;
+      --spot-y: 30%;
+      --spot-alpha: 0.18;
+      --hot: 0 255 106;
+      --cyan: #5de8d0;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.02) contrast(1.02);
+    }
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.30));
+      pointer-events: none;
+    }
+    .spot {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x) var(--spot-y),
+          rgb(var(--accent-rgb) / var(--spot-alpha)),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: calc(0.95 * var(--spot-ready, 0));
+    }
+    body.in-shell .spot { opacity: 0 !important; }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .tablet-screen {
+      height: 100%;
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tablet-header {
+      padding: 0.4rem 0.7rem;
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      color: var(--cyan);
+      text-shadow: 0 0 10px rgba(93, 232, 208, 0.35);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
+      opacity: 0;
+    }
+
+    .tablet-body {
+      flex: 1;
+      overflow: hidden;
+      padding: 0.3rem 0.7rem 0.2rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tablet-text {
+      flex: 1;
+      overflow: hidden;
+      color: var(--cyan);
+      text-shadow: 0 0 8px rgba(93, 232, 208, 0.2);
+      font-size: 0.78rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      text-align: center;
+    }
+
+    .tablet-nav {
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.3rem 0;
+      gap: 0.5rem;
+    }
+    .tablet-nav button {
+      border: 1px solid rgba(93, 232, 208, 0.25);
+      background: rgba(93, 232, 208, 0.06);
+      color: var(--cyan);
+      text-shadow: 0 0 8px rgba(93, 232, 208, 0.25);
+      padding: 0.2rem 0.7rem;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .tablet-nav button:hover {
+      background: rgba(93, 232, 208, 0.12);
+      border-color: rgba(93, 232, 208, 0.45);
+    }
+    .tablet-nav button:disabled {
+      opacity: 0.3;
+      cursor: default;
+    }
+    .tablet-nav .page-info {
+      font-size: 0.65rem;
+      color: rgba(93, 232, 208, 0.55);
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    body:not(.in-shell) .standalone-exit {
+      display: inline-block;
+    }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+
+    .overlay > a.hotspot { pointer-events: all; cursor: pointer; }
+    .overlay > a.hotspot rect {
+      fill: rgb(var(--hot) / 0.02);
+      stroke: transparent;
+      stroke-width: 6px;
+      vector-effect: non-scaling-stroke;
+    }
+    .overlay > a.hotspot:hover rect {
+      fill: rgb(var(--hot) / 0.07);
+    }
+    .overlay > a.hotspot:focus-visible rect {
+      fill: rgb(var(--hot) / 0.10);
+      stroke: rgb(var(--hot) / 0.90);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <script>if (window.self !== window.top) document.body.classList.add('in-shell');</script>
+  <main class="scene">
+    <img class="bg" src="../pics/library-tablet.jpg" alt="Cyberpunk tablet on a desk in the library, screen glowing cyan.">
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot" aria-hidden="true"></div>
+
+    <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+
+    <svg class="overlay" viewBox="0 0 1408 768" preserveAspectRatio="xMidYMid slice" aria-label="Tablet overlays">
+      <a href="library.html" class="hotspot" aria-label="Back to Library Room">
+        <rect x="0" y="0" width="1408" height="150" rx="0" ry="0"/>
+      </a>
+      <foreignObject x="350" y="180" width="700" height="400">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="tablet-screen">
+          <div class="tablet-header" aria-hidden="true">
+            「NEO-KYOTO ARCHIVES」| CYBERNETIC LIBRARY | [VER. 3.9]
+          </div>
+          <div class="tablet-body">
+            <div class="tablet-text" id="page-text"></div>
+            <div class="tablet-nav">
+              <button type="button" id="btn-prev" disabled>◂ prev</button>
+              <span class="page-info" id="page-info"></span>
+              <button type="button" id="btn-next">next ▸</button>
+            </div>
+          </div>
+        </div>
+      </foreignObject>
+    </svg>
+  </main>
+
+  <script src="../js/wells-data.js"></script>
+  <script>
+    (function () {
+      var root = document.documentElement;
+      root.dataset.theme = 'dark';
+
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var raf = 0, lastX = 0, lastY = 0;
+      function onPointerMove(e) {
+        if (e.pointerType === 'touch') return;
+        lastX = e.clientX; lastY = e.clientY;
+        if (raf) return;
+        raf = window.requestAnimationFrame(function () {
+          raf = 0;
+          root.style.setProperty('--spot-x', lastX + 'px');
+          root.style.setProperty('--spot-y', lastY + 'px');
+          root.style.setProperty('--spot-ready', '1');
+        });
+      }
+      if (!reduceMotion) {
+        root.style.setProperty('--spot-ready', '0');
+        window.addEventListener('pointermove', onPointerMove, { passive: true });
+      }
+
+      var textEl = document.getElementById('page-text');
+      var infoEl = document.getElementById('page-info');
+      var prevBtn = document.getElementById('btn-prev');
+      var nextBtn = document.getElementById('btn-next');
+
+      var fullText = '';
+      var pages = [];
+      var currentPage = 0;
+
+      function paginate() {
+        pages = [];
+        if (!fullText) return;
+
+        var clone = textEl.cloneNode(false);
+        clone.style.position = 'absolute';
+        clone.style.visibility = 'hidden';
+        clone.style.height = textEl.clientHeight + 'px';
+        clone.style.width = textEl.clientWidth + 'px';
+        textEl.parentNode.appendChild(clone);
+
+        var words = fullText.split(/(\s+)/);
+        var start = 0;
+        var safety = 0;
+
+        while (start < words.length && safety < 5000) {
+          safety++;
+          clone.textContent = '';
+          var lo = start + 1;
+          var hi = words.length;
+          var fit = start;
+
+          while (lo <= hi) {
+            var mid = (lo + hi) >>> 1;
+            clone.textContent = words.slice(start, mid).join('');
+            if (clone.scrollHeight <= clone.clientHeight) {
+              fit = mid;
+              lo = mid + 1;
+            } else {
+              hi = mid - 1;
+            }
+          }
+
+          if (fit <= start) fit = start + 1;
+          pages.push(words.slice(start, fit).join(''));
+          start = fit;
+        }
+
+        clone.remove();
+      }
+
+      function render() {
+        if (!pages.length) { textEl.textContent = 'Loading…'; return; }
+        textEl.textContent = pages[currentPage] || '';
+        infoEl.textContent = (currentPage + 1) + ' / ' + pages.length;
+        prevBtn.disabled = currentPage <= 0;
+        nextBtn.disabled = currentPage >= pages.length - 1;
+      }
+
+      prevBtn.addEventListener('click', function () {
+        if (currentPage > 0) { currentPage--; render(); }
+      });
+      nextBtn.addEventListener('click', function () {
+        if (currentPage < pages.length - 1) { currentPage++; render(); }
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          if (currentPage > 0) { currentPage--; render(); e.preventDefault(); }
+        } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+          if (currentPage < pages.length - 1) { currentPage++; render(); e.preventDefault(); }
+        }
+      });
+
+      function stripGutenbergHeader(raw) {
+        var startMarker = '*** START OF THE PROJECT GUTENBERG EBOOK';
+        var endMarker = '*** END OF THE PROJECT GUTENBERG EBOOK';
+        var si = raw.indexOf(startMarker);
+        if (si !== -1) {
+          var nl = raw.indexOf('\n', si);
+          raw = nl !== -1 ? raw.substring(nl + 1) : raw.substring(si + startMarker.length);
+        }
+        var ei = raw.indexOf(endMarker);
+        if (ei !== -1) raw = raw.substring(0, ei);
+        return raw.trim();
+      }
+
+      if (typeof WELLS_TEXT === 'string' && WELLS_TEXT.length) {
+        fullText = stripGutenbergHeader(WELLS_TEXT);
+        paginate();
+        render();
+      } else {
+        textEl.textContent = '[Error loading text]';
+      }
+
+      var resizeTimer = 0;
+      window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+          var approxPos = pages.length ? currentPage / pages.length : 0;
+          paginate();
+          currentPage = Math.min(Math.round(approxPos * pages.length), pages.length - 1);
+          render();
+        }, 200);
+      });
+    })();
+  </script>
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>

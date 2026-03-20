@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — AMM Terminal</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+      --accent: #7df0ff;
+      --accent-rgb: 125 240 255;
+      --accent2: #ffc56d;
+      --accent2-rgb: 255 197 109;
+      --hot: 0 255 106;
+      --cyan: #5de8d0;
+      --purple: #c084ff;
+      --danger: #ff5d5d;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Mono", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, monospace;
+      color: var(--cyan);
+      background: var(--bg);
+      overflow: hidden;
+    }
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.02) contrast(1.02);
+    }
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.30));
+      pointer-events: none;
+    }
+    .spot {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+          rgb(var(--accent-rgb) / 0.18),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: calc(0.95 * var(--spot-ready, 0));
+    }
+    body.in-shell .spot { opacity: 0 !important; }
+
+    .crt::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.15) 0px,
+          rgba(0, 0, 0, 0.15) 1px,
+          transparent 1px,
+          transparent 2px
+        );
+      pointer-events: none;
+      z-index: 10;
+    }
+    .crt::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.4) 100%);
+      pointer-events: none;
+      z-index: 11;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .terminal-screen {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(96vw, 1200px);
+      height: min(96vh, 820px);
+      background: rgba(6, 14, 20, 0.95);
+      border: 1px solid rgba(93, 232, 208, 0.25);
+      border-radius: 8px;
+      box-shadow:
+        0 0 40px rgba(93, 232, 208, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .terminal-header {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid rgba(93, 232, 208, 0.15);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+    }
+    .terminal-header span {
+      opacity: 0.7;
+    }
+    .terminal-header .close-btn {
+      width: 1.4rem;
+      height: 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 0.75rem;
+      color: var(--cyan);
+      text-decoration: none;
+      font-size: 1.1rem;
+      line-height: 1;
+      opacity: 0.6;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .terminal-header .close-btn:hover {
+      opacity: 1;
+      background: rgba(255, 93, 93, 0.15);
+      border-color: rgba(255, 93, 93, 0.4);
+      color: var(--danger);
+    }
+
+    .terminal-body {
+      flex: 1;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      overflow: auto;
+    }
+
+    .amm-intro {
+      text-align: center;
+      padding: 0.25rem 0;
+    }
+    .amm-intro h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.1rem;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+      text-shadow: 0 0 15px rgba(93, 232, 208, 0.3);
+    }
+    .amm-intro .subtitle {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin: 0;
+    }
+
+    .reserves-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .reserve-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .token-name-input {
+      background: rgba(93, 232, 208, 0.08);
+      border: 1px solid rgba(93, 232, 208, 0.2);
+      border-radius: 4px;
+      padding: 0.4rem;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 0.75rem;
+      text-align: center;
+    }
+    .token-name-input:focus {
+      outline: none;
+      border-color: rgba(93, 232, 208, 0.4);
+    }
+    .reserve-num-input {
+      background: rgba(93, 232, 208, 0.08);
+      border: 1px solid rgba(93, 232, 208, 0.2);
+      border-radius: 4px;
+      padding: 0.5rem;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 1rem;
+      text-align: center;
+    }
+    .reserve-num-input:focus {
+      outline: none;
+      border-color: rgba(93, 232, 208, 0.4);
+      box-shadow: 0 0 10px rgba(93, 232, 208, 0.1);
+    }
+    .k-display {
+      text-align: center;
+      font-size: 0.85rem;
+      opacity: 0.8;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(93, 232, 208, 0.1);
+    }
+
+    .stats-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0.75rem;
+      background: rgba(93, 232, 208, 0.05);
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+    .stat-item.negative .stat-value {
+      color: var(--danger);
+    }
+    .stat-label {
+      opacity: 0.6;
+    }
+    .stat-value {
+      color: var(--accent2);
+      font-weight: 500;
+    }
+
+    .chart-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .curve-wrap {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: rgba(6, 10, 14, 0.6);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .curve-wrap canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 1rem;
+      flex: 1;
+      min-height: 0;
+    }
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 0;
+    }
+
+    .amm-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 700px) {
+      .amm-grid { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: rgba(93, 232, 208, 0.05);
+      border: 1px solid rgba(93, 232, 208, 0.15);
+      border-radius: 6px;
+      padding: 1rem;
+    }
+    .panel h3 {
+      margin: 0 0 1rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      opacity: 0.7;
+      font-weight: 400;
+    }
+
+    .slider-group {
+      margin-bottom: 1rem;
+    }
+    .slider-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      opacity: 0.7;
+      margin-bottom: 0.4rem;
+    }
+    .slider-group input[type="range"] {
+      width: 100%;
+      height: 4px;
+      background: rgba(93, 232, 208, 0.15);
+      border-radius: 2px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .slider-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--cyan);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(93, 232, 208, 0.5);
+    }
+    .slider-group input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: var(--cyan);
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 10px rgba(93, 232, 208, 0.5);
+    }
+
+    .direction-toggle {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .direction-toggle button {
+      flex: 1;
+      padding: 0.5rem;
+      background: rgba(93, 232, 208, 0.08);
+      border: 1px solid rgba(93, 232, 208, 0.2);
+      border-radius: 4px;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .direction-toggle button:hover {
+      background: rgba(93, 232, 208, 0.12);
+      border-color: rgba(93, 232, 208, 0.35);
+    }
+    .direction-toggle button.active {
+      background: rgba(93, 232, 208, 0.2);
+      border-color: rgba(93, 232, 208, 0.5);
+      box-shadow: 0 0 15px rgba(93, 232, 208, 0.15);
+    }
+
+    .swap-input {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .swap-input input {
+      flex: 1;
+      background: rgba(93, 232, 208, 0.08);
+      border: 1px solid rgba(93, 232, 208, 0.2);
+      border-radius: 4px;
+      padding: 0.5rem;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: 1rem;
+    }
+    .swap-input input:focus {
+      outline: none;
+      border-color: rgba(93, 232, 208, 0.4);
+      box-shadow: 0 0 10px rgba(93, 232, 208, 0.1);
+    }
+    .swap-input span {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      min-width: 4rem;
+    }
+
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(93, 232, 208, 0.1);
+      font-size: 0.8rem;
+    }
+    .result-row:last-child { border-bottom: none; }
+    .result-row .label { opacity: 0.6; }
+    .result-row .value {
+      color: var(--accent2);
+    }
+    .result-row .value.negative {
+      color: var(--danger);
+    }
+
+    #curve-canvas {
+      width: 100%;
+      height: 200px;
+      background: rgba(6, 10, 14, 0.6);
+      border-radius: 4px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 0.5rem;
+      font-size: 0.65rem;
+    }
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      opacity: 0.7;
+    }
+    .legend .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .legend .dot.current { background: var(--cyan); }
+    .legend .dot.after { background: var(--accent2); }
+
+    .back-hotspot {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .back-hotspot a {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .back-hotspot rect {
+      fill: rgb(var(--hot) / 0.02);
+      stroke: transparent;
+      stroke-width: 6px;
+      vector-effect: non-scaling-stroke;
+      transition: fill 0.15s;
+    }
+    .back-hotspot a:hover rect {
+      fill: rgb(var(--hot) / 0.07);
+      stroke: transparent;
+    }
+    .back-hotspot a:focus-visible rect {
+      fill: rgb(var(--hot) / 0.10);
+      stroke: rgb(var(--hot) / 0.90);
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    body:not(.in-shell) .standalone-exit { display: inline-block; }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+
+    .simplifications {
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: rgba(93, 232, 208, 0.03);
+      border: 1px solid rgba(93, 232, 208, 0.1);
+      border-radius: 4px;
+      font-size: 0.7rem;
+      opacity: 0.8;
+    }
+    .simplifications h4 {
+      margin: 0 0 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 400;
+      opacity: 0.9;
+    }
+    .simplifications ul {
+      margin: 0;
+      padding-left: 1.2rem;
+      opacity: 0.7;
+    }
+    .simplifications li {
+      margin-bottom: 0.25rem;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <script>if (window.self !== window.top) document.body.classList.add('in-shell');</script>
+  <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+
+  <main class="scene">
+    <img class="bg" src="../pics/rooftop-main.jpg" alt="Rainy cyberpunk rooftop with Web3 portal.">
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot" aria-hidden="true"></div>
+
+    <svg class="back-hotspot" viewBox="0 0 1376 768" preserveAspectRatio="xMidYMid slice" aria-label="Back to rooftop">
+      <a href="../places/rooftop.html" aria-label="Back to Rooftop">
+        <rect x="0" y="0" width="1376" height="100" rx="0" ry="0"></rect>
+      </a>
+    </svg>
+
+    <div class="overlay crt">
+      <div class="terminal-screen">
+        <div class="terminal-header">
+          <span>AMM_TERMINAL_v1.0 // Constant Product Market Maker</span>
+          <a href="../places/rooftop.html" class="close-btn" aria-label="Close terminal" title="Close">×</a>
+        </div>
+        <div class="terminal-body">
+          <div class="amm-intro">
+            <h1>AMM Price Impact</h1>
+            <p class="subtitle">See how the constant product formula affects swap prices</p>
+          </div>
+
+          <div class="main-grid">
+            <div class="left-col">
+              <div class="panel">
+                <h3>Pool Reserves</h3>
+                <div class="reserves-grid">
+                  <div class="reserve-input-group">
+                    <input type="text" id="token-x-name" class="token-name-input" value="Token X" maxlength="12">
+                    <input type="number" id="reserve-x-input" class="reserve-num-input" value="1000" min="1" step="1">
+                  </div>
+                  <div class="reserve-input-group">
+                    <input type="text" id="token-y-name" class="token-name-input" value="Token Y" maxlength="12">
+                    <input type="number" id="reserve-y-input" class="reserve-num-input" value="1000" min="1" step="1">
+                  </div>
+                </div>
+                <div class="k-display">k = <span id="k-value">1,000,000</span></div>
+              </div>
+
+              <div class="panel">
+                <h3>Swap</h3>
+                <div class="direction-toggle">
+                  <button id="dir-x-to-y" class="active">Swap Token X → Token Y</button>
+                  <button id="dir-y-to-x">Swap Token Y → Token X</button>
+                </div>
+                <div class="swap-input">
+                  <input type="number" id="swap-amount" value="100" min="0" step="0.01">
+                  <span id="swap-token">Token X</span>
+                </div>
+              </div>
+
+              <div class="panel">
+                <h3>Swap Results</h3>
+                <div class="stats-list">
+                  <div class="stat-item">
+                    <span class="stat-label">You Send</span>
+                    <span class="stat-value" id="send-amount">100.00 X</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">You Receive</span>
+                    <span class="stat-value" id="receive-amount">— Y</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Spot Price (before)</span>
+                    <span class="stat-value" id="spot-price">1.00</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Execution Price</span>
+                    <span class="stat-value" id="exec-price">—</span>
+                  </div>
+                  <div class="stat-item negative" id="impact-stat">
+                    <span class="stat-label">Price Impact</span>
+                    <span class="stat-value" id="price-impact">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="right-col">
+              <div class="panel chart-panel">
+                <h3>Constant Product Curve</h3>
+                <div class="curve-wrap" aria-label="Constant product curve (square)">
+                  <canvas id="curve-canvas"></canvas>
+                </div>
+                <div class="legend">
+                  <span><span class="dot current"></span> Current Position</span>
+                  <span><span class="dot after"></span> After Swap</span>
+                </div>
+              </div>
+
+              <div class="simplifications">
+                <h4>ℹ️ Simplifications</h4>
+                <ul>
+                  <li><strong>No Fees:</strong> Real AMMs charge swap fees, which worsen execution price.</li>
+                  <li><strong>Manual Reserves:</strong> You set pool reserves directly; this doesn't simulate deposits/withdrawals.</li>
+                  <li><strong>Single-Swap View:</strong> The pool doesn't persist state after a swap.</li>
+                  <li><strong>External Markets:</strong> Ignores outside prices, arbitrage, and LP behavior.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function() {
+      const tokenXNameInput = document.getElementById('token-x-name');
+      const tokenYNameInput = document.getElementById('token-y-name');
+      const reserveXInput = document.getElementById('reserve-x-input');
+      const reserveYInput = document.getElementById('reserve-y-input');
+      const kValue = document.getElementById('k-value');
+      const dirXtoY = document.getElementById('dir-x-to-y');
+      const dirYtoX = document.getElementById('dir-y-to-x');
+      const swapAmount = document.getElementById('swap-amount');
+      const swapToken = document.getElementById('swap-token');
+      const sendAmount = document.getElementById('send-amount');
+      const receiveAmount = document.getElementById('receive-amount');
+      const spotPrice = document.getElementById('spot-price');
+      const execPrice = document.getElementById('exec-price');
+      const priceImpact = document.getElementById('price-impact');
+      const impactStat = document.getElementById('impact-stat');
+      const canvas = document.getElementById('curve-canvas');
+      const ctx = canvas.getContext('2d');
+
+      let direction = 'x-to-y';
+
+      function formatNum(n, decimals = 2) {
+        if (n >= 1000000) return (n / 1000000).toFixed(decimals) + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(decimals) + 'K';
+        return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+      }
+
+      function setupCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        return { width: rect.width, height: rect.height };
+      }
+
+      function update() {
+        const reserveX = parseFloat(reserveXInput.value) || 1000;
+        const reserveY = parseFloat(reserveYInput.value) || 1000;
+        const K = reserveX * reserveY;
+        const amount = parseFloat(swapAmount.value) || 0;
+        const tokenXName = tokenXNameInput.value.trim() || 'Token X';
+        const tokenYName = tokenYNameInput.value.trim() || 'Token Y';
+
+        kValue.textContent = K.toLocaleString();
+
+        // Calculate swap
+        let newX, newY, sent, received, spot, exec, impact;
+
+        if (direction === 'x-to-y') {
+          sent = amount;
+          newX = reserveX + sent;
+          newY = K / newX;
+          received = reserveY - newY;
+          spot = reserveY / reserveX;
+          exec = sent > 0 ? received / sent : spot;
+          impact = ((exec - spot) / spot) * 100;
+        } else {
+          sent = amount;
+          newY = reserveY + sent;
+          newX = K / newY;
+          received = reserveX - newX;
+          spot = reserveX / reserveY;
+          exec = sent > 0 ? received / sent : spot;
+          impact = ((exec - spot) / spot) * 100;
+        }
+
+        // Update UI
+        const inToken = direction === 'x-to-y' ? tokenXName : tokenYName;
+        const outToken = direction === 'x-to-y' ? tokenYName : tokenXName;
+
+        swapToken.textContent = inToken;
+        sendAmount.textContent = `${formatNum(sent)} ${inToken}`;
+        receiveAmount.textContent = sent > 0 ? `${formatNum(received)} ${outToken}` : `— ${outToken}`;
+        spotPrice.textContent = `1 ${inToken} = ${spot.toFixed(4)} ${outToken}`;
+        execPrice.textContent = sent > 0 ? `1 ${inToken} = ${exec.toFixed(4)} ${outToken}` : '—';
+        priceImpact.textContent = sent > 0 ? `${impact > 0 ? '+' : ''}${impact.toFixed(2)}%` : '—';
+        impactStat.classList.toggle('negative', Math.abs(impact) > 1);
+
+        // Update button labels
+        dirXtoY.textContent = `Swap ${tokenXName} → ${tokenYName}`;
+        dirYtoX.textContent = `Swap ${tokenYName} → ${tokenXName}`;
+
+        drawCurve(reserveX, reserveY, newX, newY, K);
+      }
+
+      function drawCurve(x0, y0, x1, y1, K) {
+        const { width: w, height: h } = setupCanvas();
+        const padding = 50;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Grid
+        ctx.strokeStyle = 'rgba(93, 232, 208, 0.1)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 5; i++) {
+          const x = padding + (w - 2 * padding) * i / 5;
+          const y = padding + (h - 2 * padding) * i / 5;
+          ctx.beginPath();
+          ctx.moveTo(x, padding);
+          ctx.lineTo(x, h - padding);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(padding, y);
+          ctx.lineTo(w - padding, y);
+          ctx.stroke();
+        }
+
+        // Axes
+        ctx.strokeStyle = 'rgba(93, 232, 208, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding, h - padding);
+        ctx.lineTo(w - padding, h - padding);
+        ctx.moveTo(padding, h - padding);
+        ctx.lineTo(padding, padding);
+        ctx.stroke();
+
+        // Axis labels with values
+        const maxAxis = Math.max(x0, y0, x1 || 0, y1 || 0) * 1.8;
+        ctx.fillStyle = 'rgba(93, 232, 208, 0.6)';
+        ctx.font = '10px SF Mono, monospace';
+        ctx.textAlign = 'center';
+        for (let i = 0; i <= 5; i++) {
+          const val = (maxAxis * i / 5);
+          const x = padding + (w - 2 * padding) * i / 5;
+          ctx.fillText(formatNum(val, 0), x, h - padding + 18);
+        }
+        ctx.textAlign = 'right';
+        for (let i = 0; i <= 5; i++) {
+          const val = (maxAxis * i / 5);
+          const y = h - padding - (h - 2 * padding) * i / 5;
+          ctx.fillText(formatNum(val, 0), padding - 8, y + 4);
+        }
+
+        // Axis titles
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(93, 232, 208, 0.8)';
+        ctx.font = '12px SF Mono, monospace';
+        ctx.fillText('Token X Reserve', w / 2, h - 5);
+        ctx.save();
+        ctx.translate(18, h / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Token Y Reserve', 0, 0);
+        ctx.restore();
+
+        // Hyperbola curve: y = K/x
+        ctx.strokeStyle = 'rgba(93, 232, 208, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        let firstPoint = true;
+        for (let px = padding + 1; px < w - padding; px += 2) {
+          const xVal = ((px - padding) / (w - 2 * padding)) * maxAxis + 0.1;
+          const yVal = K / xVal;
+          const py = h - padding - (yVal / maxAxis) * (h - 2 * padding);
+          if (py >= padding && py <= h - padding) {
+            if (firstPoint) {
+              ctx.moveTo(px, py);
+              firstPoint = false;
+            } else {
+              ctx.lineTo(px, py);
+            }
+          }
+        }
+        ctx.stroke();
+
+        // Current point
+        const curX = padding + (x0 / maxAxis) * (w - 2 * padding);
+        const curY = h - padding - (y0 / maxAxis) * (h - 2 * padding);
+        
+        ctx.shadowColor = '#5de8d0';
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = '#5de8d0';
+        ctx.beginPath();
+        ctx.arc(curX, curY, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // After swap point
+        const aftX = padding + (x1 / maxAxis) * (w - 2 * padding);
+        const aftY = h - padding - (y1 / maxAxis) * (h - 2 * padding);
+        
+        ctx.shadowColor = '#ffc56d';
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = '#ffc56d';
+        ctx.beginPath();
+        ctx.arc(aftX, aftY, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Arrow showing movement
+        ctx.strokeStyle = '#ffc56d';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(curX, curY);
+        ctx.lineTo(aftX, aftY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Event listeners
+      reserveXInput.addEventListener('input', update);
+      reserveYInput.addEventListener('input', update);
+      tokenXNameInput.addEventListener('input', update);
+      tokenYNameInput.addEventListener('input', update);
+      swapAmount.addEventListener('input', update);
+
+      dirXtoY.addEventListener('click', () => {
+        direction = 'x-to-y';
+        dirXtoY.classList.add('active');
+        dirYtoX.classList.remove('active');
+        update();
+      });
+
+      dirYtoX.addEventListener('click', () => {
+        direction = 'y-to-x';
+        dirYtoX.classList.add('active');
+        dirXtoY.classList.remove('active');
+        update();
+      });
+
+      // Handle resize
+      window.addEventListener('resize', () => {
+        requestAnimationFrame(update);
+      });
+
+      // Spot effect
+      const root = document.documentElement;
+      let raf = 0, lastX = 0, lastY = 0;
+      function onPointerMove(e) {
+        if (e.pointerType === 'touch') return;
+        lastX = e.clientX; lastY = e.clientY;
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          root.style.setProperty('--spot-x', lastX + 'px');
+          root.style.setProperty('--spot-y', lastY + 'px');
+          root.style.setProperty('--spot-ready', '1');
+        });
+      }
+      window.addEventListener('pointermove', onPointerMove, { passive: true });
+
+      // Initial draw
+      update();
+    })();
+  </script>
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>

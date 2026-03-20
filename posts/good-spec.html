@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>How to write a good spec for AI agents — Addy Osmani</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0.85rem 0.95rem;
+      background: rgb(0 0 0 / 0);
+      color: rgb(232 238 246 / 0.92);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+    h1 { font-size: 1.05rem; margin: 0 0 0.55rem; }
+    h2 { font-size: 0.98rem; margin: 1.3rem 0 0.6rem; }
+    p { margin: 0 0 0.75rem; }
+    hr { border: 0; border-top: 1px solid rgb(125 240 255 / 0.16); margin: 1rem 0; }
+    a { color: rgb(125 240 255 / 0.92); text-decoration: none; }
+    a:hover { border-bottom: 1px solid rgb(125 240 255 / 0.65); }
+    ul, ol { margin: 0 0 0.85rem; padding-left: 1.4rem; }
+    li { margin-bottom: 0.35rem; }
+    code { color: rgb(125 240 255 / 0.8); font-size: 0.88em; }
+    pre { background: rgb(125 240 255 / 0.04); border: 1px solid rgb(125 240 255 / 0.12); border-radius: 8px; padding: 0.7rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.4; }
+    pre code { color: rgb(232 238 246 / 0.85); }
+    blockquote { border-left: 2px solid rgb(125 240 255 / 0.3); margin: 0.9rem 0; padding-left: 0.9rem; color: rgb(232 238 246 / 0.74); font-style: italic; }
+    blockquote p { margin: 0 0 0.6rem; }
+    img { max-width: 100%; height: auto; display: block; margin: 0.9rem 0; border-radius: 8px; }
+    table { border-collapse: collapse; width: 100%; margin: 0.9rem 0; font-size: 0.82rem; }
+    th, td { border: 1px solid rgb(125 240 255 / 0.16); padding: 0.4rem 0.6rem; text-align: left; }
+    th { background: rgb(125 240 255 / 0.06); color: rgb(125 240 255 / 0.92); }
+    .date { color: rgb(232 238 246 / 0.66); font-size: 0.86rem; margin: 0 0 0.9rem; }
+  </style>
+</head>
+<body>
+<article>
+  <h1>How to write a good spec for AI agents</h1>
+  <p class="date"><i>Addy Osmani · <time datetime="2026-01-13">13 Jan, 2026</time> · <a href="https://addyosmani.com/blog/good-spec/" target="_blank" rel="noopener">Original</a></i></p>
+
+  <p><strong>TL;DR: Aim for a clear spec covering just enough nuance (this may include structure, style, testing, boundaries) to guide the AI without overwhelming it. Break large tasks into smaller ones vs. keeping everything in one large prompt. Plan first in read-only mode, then execute and iterate continuously.</strong></p>
+
+  <p><em>"I've heard a lot about writing good specs for AI agents, but haven't found a solid framework yet. I could write a spec that rivals an RFC, but at some point the context is too large and the model breaks down."</em></p>
+
+  <p>Many developers share this frustration. Simply throwing a massive spec at an AI agent doesn't work — context window limits and the model's "attention budget" get in the way. The key is to write smart specs: documents that guide the agent clearly, stay within practical context sizes, and evolve with the project. This guide distills best practices from my use of coding agents including Claude Code and Gemini CLI into a framework for spec-writing that keeps your AI agents focused and productive.</p>
+
+  <p>We'll cover five principles for great AI agent specs, each starting with a bolded takeaway.</p>
+
+  <hr>
+
+  <h2>1. Start with a high-level vision and let the AI draft the details</h2>
+
+  <p><strong>Kick off your project with a concise high-level spec, then have the AI expand it into a detailed plan.</strong></p>
+
+  <p>Instead of over-engineering upfront, begin with a clear goal statement and a few core requirements. Treat this as a "product brief" and let the agent generate a more elaborate spec from it. This leverages the AI's strength in elaboration while you maintain control of the direction. This works well unless you already feel you have very specific technical requirements that must be met from the start.</p>
+
+  <p><strong>Why this works:</strong> LLM-based agents excel at fleshing out details when given a solid high-level directive, but they need a clear mission to avoid drifting off course. By providing a short outline or objective description and asking the AI to produce a full specification (e.g. a spec.md), you create a persistent reference for the agent. Planning in advance matters even more with an agent — you can iterate on the plan first, then hand it off to the agent to write the code. The spec becomes the first artifact you and the AI build together.</p>
+
+  <p><strong>Practical approach:</strong> Start a new coding session by prompting, "You are an AI software engineer. Draft a detailed specification for [project X] covering objectives, features, constraints, and a step-by-step plan." Keep your initial prompt high-level — e.g. "Build a web app where users can track tasks (to-do list), with user accounts, a database, and a simple UI". The agent might respond with a structured draft spec: an overview, feature list, tech stack suggestions, data model, and so on. This spec then becomes the "source of truth" that both you and the agent can refer back to. GitHub's AI team promotes <a href="https://github.blog/ai-and-ml/generative-ai/spec-driven-development-with-ai-get-started-with-a-new-open-source-toolkit/" target="_blank" rel="noopener">spec-driven development</a> where "specs become the shared source of truth… living, executable artifacts that evolve with the project". Before writing any code, review and refine the AI's spec. Make sure it aligns with your vision and correct any hallucinations or off-target details.</p>
+
+  <p><strong>Use Plan Mode to enforce planning-first:</strong> Tools like Claude Code offer a <a href="https://code.claude.com/docs/en/common-workflows" target="_blank" rel="noopener">Plan Mode</a> that restricts the agent to read-only operations — it can analyze your codebase and create detailed plans but won't write any code until you're ready. This is ideal for the planning phase: start in Plan Mode (Shift+Tab in Claude Code), describe what you want to build, and let the agent draft a spec while exploring your existing code. Ask it to clarify ambiguities by questioning you about the plan. Have it review the plan for architecture, best practices, security risks, and testing strategy. The goal is to refine the plan until there's no room for misinterpretation. Only then do you exit Plan Mode and let the agent execute. This workflow prevents the common trap of jumping straight into code generation before the spec is solid.</p>
+
+  <p><strong>Use the spec as context:</strong> Once approved, save this spec (e.g. as SPEC.md) and feed relevant sections into the agent as needed. Many developers using a strong model do exactly this — the spec file persists between sessions, anchoring the AI whenever work resumes on the project. This mitigates the forgetfulness that can happen when the conversation history gets too long or when you have to restart an agent. It's akin to how one would use a Product Requirements Document (PRD) in a team: a reference that everyone (human or AI) can consult to stay on track. Experienced folks often "<a href="https://simonwillison.net/2025/Oct/7/vibe-engineering/" target="_blank" rel="noopener">write good documentation first</a> and the model may be able to build the matching implementation from that input alone" as one engineer observed. The spec is that documentation.</p>
+
+  <p><strong>Keep it goal-oriented:</strong> A high-level spec for an AI agent should focus on <em>what</em> and <em>why</em>, more than the nitty-gritty <em>how</em> (at least initially). Think of it like the user story and acceptance criteria: Who is the user? What do they need? What does success look like? (e.g. "User can add, edit, complete tasks; data is saved persistently; the app is responsive and secure"). This keeps the AI's detailed spec grounded in user needs and outcome, not just technical to-dos. As the <a href="https://github.blog/ai-and-ml/generative-ai/spec-driven-development-with-ai-get-started-with-a-new-open-source-toolkit/" target="_blank" rel="noopener">GitHub Spec Kit docs</a> put it, provide a high-level description of what you're building and why, and let the coding agent generate a detailed specification focusing on user experience and success criteria. Starting with this big-picture vision prevents the agent from losing sight of the forest for the trees when it later gets into coding.</p>
+
+  <hr>
+
+  <h2>2. Structure the spec like a professional PRD (or SRS)</h2>
+
+  <p><strong>Treat your AI spec as a structured document (PRD) with clear sections, not a loose pile of notes.</strong></p>
+
+  <p>Many developers treat specs for agents much like traditional Product Requirement Documents (PRDs) or System Design docs — comprehensive, well-organized, and easy for a "literal-minded" AI to parse. This formal approach gives the agent a blueprint to follow and reduces ambiguity.</p>
+
+  <p><strong>The six core areas:</strong> GitHub's analysis of <a href="https://github.blog/ai-and-ml/github-copilot/how-to-write-a-great-agents-md-lessons-from-over-2500-repositories/" target="_blank" rel="noopener">over 2,500 agent configuration files</a> revealed a clear pattern: the most effective specs cover six areas. Use this as a checklist for completeness:</p>
+
+  <ol>
+    <li><strong>Commands:</strong> Put executable commands early — not just tool names, but full commands with flags: <code>npm test</code>, <code>pytest -v</code>, <code>npm run build</code>. The agent will reference these constantly.</li>
+    <li><strong>Testing:</strong> How to run tests, what framework you use, where test files live, and what coverage expectations exist.</li>
+    <li><strong>Project structure:</strong> Where source code lives, where tests go, where docs belong. Be explicit: "<code>src/</code> for application code, <code>tests/</code> for unit tests, <code>docs/</code> for documentation."</li>
+    <li><strong>Code style:</strong> One real code snippet showing your style beats three paragraphs describing it. Include naming conventions, formatting rules, and examples of good output.</li>
+    <li><strong>Git workflow:</strong> Branch naming, commit message format, PR requirements. The agent can follow these if you spell them out.</li>
+    <li><strong>Boundaries:</strong> What the agent should never touch — secrets, vendor directories, production configs, specific folders. "Never commit secrets" was the single most common helpful constraint in the GitHub study.</li>
+  </ol>
+
+  <p><strong>Be specific about your stack:</strong> Say "React 18 with TypeScript, Vite, and Tailwind CSS" not "React project." Include versions and key dependencies. Vague specs produce vague code.</p>
+
+  <p><strong>Use a consistent format:</strong> Clarity is king. Many devs use Markdown headings or even XML-like tags in the spec to delineate sections, because AI models handle well-structured text better than free-form prose. For example, you might structure the spec as:</p>
+
+  <pre><code># Project Spec: My team's tasks app
+
+## Objective
+- Build a web app for small teams to manage tasks...
+
+## Tech Stack
+- React 18+, TypeScript, Vite, Tailwind CSS
+- Node.js/Express backend, PostgreSQL, Prisma ORM
+
+## Commands
+- Build: `npm run build` (compiles TypeScript, outputs to dist/)
+- Test: `npm test` (runs Jest, must pass before commits)
+- Lint: `npm run lint --fix` (auto-fixes ESLint errors)
+
+## Project Structure
+- `src/` – Application source code
+- `tests/` – Unit and integration tests
+- `docs/` – Documentation
+
+## Boundaries
+- ✅ Always: Run tests before commits, follow naming conventions
+- ⚠️ Ask first: Database schema changes, adding dependencies
+- 🚫 Never: Commit secrets, edit node_modules/, modify CI config</code></pre>
+
+  <p>This level of organization not only helps you think clearly, it helps the AI find information. Anthropic engineers recommend <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" target="_blank" rel="noopener">organizing prompts into distinct sections</a> for exactly this reason — it gives the model strong cues about which info is which. And remember, "minimal does not necessarily mean short" — don't shy away from detail in the spec if it matters, but keep it focused.</p>
+
+  <p><strong>Integrate specs into your toolchain:</strong> Treat specs as "executable artifacts" tied to version control and CI/CD. The <a href="https://github.blog/ai-and-ml/generative-ai/spec-driven-development-with-ai-get-started-with-a-new-open-source-toolkit/" target="_blank" rel="noopener">GitHub Spec Kit</a> uses a four-phase, gated workflow that makes your specification the center of your engineering process. Instead of writing a spec and setting it aside, the spec drives the implementation, checklists, and task breakdowns. Your primary role is to steer; the coding agent does the bulk of the writing. Each phase has a specific job, and you don't move to the next one until the current task is fully validated:</p>
+
+  <img src="images/spec-driven-development.jpg" alt="Spec Driven Development Workflow">
+
+  <ol>
+    <li><strong>Specify:</strong> You provide a high-level description of what you're building and why, and the coding agent generates a detailed specification. This isn't about technical stacks or app design — it's about user journeys, experiences, and what success looks like. This becomes a living artifact that evolves as you learn more.</li>
+    <li><strong>Plan:</strong> Now you get technical. You provide your desired stack, architecture, and constraints, and the coding agent generates a comprehensive technical plan. You can ask for multiple plan variations to compare approaches.</li>
+    <li><strong>Tasks:</strong> The coding agent takes the spec and plan and breaks them into actual work — small, reviewable chunks that each solve a specific piece of the puzzle. Each task should be something you can implement and test in isolation. Instead of "build authentication," you get concrete tasks like "create a user registration endpoint that validates email format."</li>
+    <li><strong>Implement:</strong> Your coding agent tackles tasks one by one (or in parallel). Instead of reviewing thousand-line code dumps, you review focused changes that solve specific problems. Crucially, your role is to verify at each phase: Does the spec capture what you want? Does the plan account for constraints? Are there edge cases the AI missed?</li>
+  </ol>
+
+  <p>This gated workflow prevents what Willison calls "house of cards code" — fragile AI outputs that collapse under scrutiny. Anthropic's Skills system offers a similar pattern, letting you define reusable Markdown-based behaviors that agents invoke.</p>
+
+  <p><strong>Consider agents.md for specialized personas:</strong> For tools like GitHub Copilot, you can create <a href="https://github.blog/ai-and-ml/github-copilot/how-to-write-a-great-agents-md-lessons-from-over-2500-repositories/" target="_blank" rel="noopener">agents.md files</a> that define specialized agent personas — a @docs-agent for technical writing, a @test-agent for QA, a @security-agent for code review. Each file acts as a focused spec for that persona's behavior, commands, and boundaries.</p>
+
+  <p><strong>Design for Agent Experience (AX):</strong> Just as we design APIs for developer experience (DX), consider designing specs for "Agent Experience." This means clean, parseable formats: OpenAPI schemas for any APIs the agent will consume, llms.txt files that summarize documentation for LLM consumption, and explicit type definitions. The Agentic AI Foundation (AAIF) is standardizing protocols like MCP (Model Context Protocol) for tool integration — specs that follow these patterns are easier for agents to consume and act on reliably.</p>
+
+  <p><strong>PRD vs SRS mindset:</strong> It helps to borrow from established documentation practices. Writing it like a PRD ensures you include user-centric context ("the why behind each feature") so the AI doesn't optimize for the wrong thing. Expanding it like an SRS ensures you nail down the specifics the AI will need to actually generate correct code. Developers have found that this extra upfront effort pays off by drastically reducing miscommunications with the agent later.</p>
+
+  <p><strong>Make the spec a "living document":</strong> Don't write it and forget it. Update the spec as you and the agent make decisions or discover new info. If the AI had to change the data model or you decided to cut a feature, reflect that in the spec so it remains the ground truth. In <a href="https://github.blog/ai-and-ml/generative-ai/spec-driven-development-with-ai-get-started-with-a-new-open-source-toolkit/" target="_blank" rel="noopener">spec-driven workflows</a>, the spec drives implementation, tests, and task breakdowns, and you don't move to coding until the spec is validated.</p>
+
+  <hr>
+
+  <h2>3. Break tasks into modular prompts and context, not one big prompt</h2>
+
+  <p><strong>Divide and conquer: give the AI one focused task at a time rather than a monolithic prompt with everything at once.</strong></p>
+
+  <p>Experienced AI engineers have learned that trying to stuff the entire project (all requirements, all code, all instructions) into a single prompt or agent message is a recipe for confusion. Not only do you risk hitting token limits, you also risk the model losing focus due to the "<a href="https://maxpool.dev/research-papers/curse_of_instructions_report.html" target="_blank" rel="noopener">curse of instructions</a>" — too many directives causing it to follow none of them well. The solution is to design your spec and workflow in a modular way, tackling one piece at a time and pulling in only the context needed for that piece.</p>
+
+  <img src="images/monolithic-prompt.jpg" alt="Modular AI Specs">
+
+  <p><strong>The curse of too much context/instructions:</strong> Research has confirmed what many devs anecdotally saw: as you pile on more instructions or data into the prompt, the model's performance in adhering to each one <a href="https://openreview.net/pdf/848f1332e941771aa491f036f6350af2effe0513.pdf" target="_blank" rel="noopener">drops significantly</a>. One study dubbed this the "curse of instructions", showing that even GPT-4 and Claude struggle when asked to satisfy many requirements simultaneously. In practical terms, if you present 10 bullet points of detailed rules, the AI might obey the first few and start overlooking others. The better strategy is iterative focus. Focus the AI on one sub-problem at a time, get that done, then move on. This keeps the quality high and errors manageable.</p>
+
+  <p><strong>Divide the spec into phases or components:</strong> If your spec document is very long or covers a lot of ground, consider splitting it into parts (either physically separate files or clearly separate sections). You don't need to always feed the frontend spec to the AI when it's working on the backend, and vice versa. Many devs using multi-agent setups even create separate agents or sub-processes for each part. Even if you use a single agent, you can emulate this by copying only the relevant spec section into the prompt for that task. Avoid context overload: Don't mix authentication tasks with database schema changes in one go. Keep each prompt tightly scoped to the current goal.</p>
+
+  <p><strong>Extended TOC / Summaries for large specs:</strong> One clever technique is to have the agent build an extended Table of Contents with summaries for the spec. This is essentially a "spec summary" that condenses each section into a few key points or keywords, and references where details can be found. By creating a hierarchical summary in the planning phase, you get a bird's-eye view that can stay in the prompt, while the fine details remain offloaded unless needed. This extended TOC acts as an index: the agent can consult it and say "aha, there's a security section I should look at", and you can then provide that section on demand. This <a href="https://addyo.substack.com/p/context-engineering-bringing-engineering" target="_blank" rel="noopener">hierarchical summarization approach</a> is known to help LLMs maintain long-term context by focusing on the high-level structure. The agent carries a "mental map" of the spec.</p>
+
+  <p><strong>Utilize sub-agents or "skills" for different spec parts:</strong> Another advanced approach is using multiple specialized agents. Each subagent is configured for a specific area of expertise and given the portion of the spec relevant to that area. For instance, you might have a Database Designer subagent that only knows about the data model section of the spec, and an API Coder subagent that knows the API endpoints spec. The main agent (or an orchestrator) can route tasks to the appropriate subagent automatically. The benefit is each agent has a smaller context window to deal with and a more focused role, which can <a href="https://10xdevelopers.dev/structured/claude-code-with-subagents/" target="_blank" rel="noopener">boost accuracy and allow parallel work</a> on independent tasks.</p>
+
+  <p><strong>Parallel agents for throughput:</strong> Running multiple agents simultaneously is emerging as "the next big thing" for developer productivity. Rather than waiting for one agent to finish before starting another task, you can spin up parallel agents for non-overlapping work. Willison describes this as "<a href="https://simonwillison.net/2025/Oct/7/vibe-engineering/" target="_blank" rel="noopener">embracing parallel coding agents</a>" and notes it's "surprisingly effective, if mentally exhausting". The key is scoping tasks so agents don't step on each other.</p>
+
+  <p><strong>Single vs. multi-agent: when to use each</strong></p>
+
+  <table>
+    <tr><th>Aspect</th><th>Single Agent</th><th>Parallel/Multi-Agent</th></tr>
+    <tr><td><strong>Strengths</strong></td><td>Simpler setup; lower overhead; easier to debug and follow</td><td>Higher throughput; handles complex interdependencies; specialists per domain</td></tr>
+    <tr><td><strong>Challenges</strong></td><td>Context overload on big projects; slower iteration; single point of failure</td><td>Coordination overhead; potential conflicts; needs shared memory (e.g., vector DBs)</td></tr>
+    <tr><td><strong>Best For</strong></td><td>Isolated modules; small-to-medium projects; early prototyping</td><td>Large codebases; one codes + one tests + one reviews; independent features</td></tr>
+    <tr><td><strong>Tips</strong></td><td>Use spec summaries; refresh context per task; start fresh sessions often</td><td>Limit to 2–3 agents initially; use MCP for tool sharing; define clear boundaries</td></tr>
+  </table>
+
+  <p><strong>Focus each prompt on one task/section:</strong> Even without fancy multi-agent setups, you can manually enforce modularity. For example, after the spec is written, your next move might be: "Step 1: Implement the database schema." You feed the agent the Database section of the spec only, plus any global constraints. Then for Step 2, "Now implement the authentication feature", you provide the Auth section. By refreshing the context for each major task, you ensure the model isn't carrying stale or irrelevant information. As one guide suggests: "<a href="https://docs.digitalocean.com/products/gradient-ai-platform/concepts/context-management/" target="_blank" rel="noopener">Start fresh: begin new sessions</a> to clear context when switching between major features".</p>
+
+  <p><strong>Use in-line directives and code TODOs:</strong> Another modularity trick is to use your code or spec as an active part of the conversation. Scaffold your code with <code>// TODO</code> comments that describe what needs to be done, and have the agent fill them one by one. Each TODO essentially acts as a mini-spec for a small task. This keeps the AI laser-focused and you can iterate in a tight loop.</p>
+
+  <p>The bottom line: small, focused context beats one giant prompt. By structuring the work into modules — and using strategies like spec summaries or sub-spec agents — you'll navigate around context size limits and the AI's short-term memory cap. Remember, a well-fed AI is like a well-fed function: give it only the <a href="https://addyo.substack.com/p/context-engineering-bringing-engineering" target="_blank" rel="noopener">inputs it needs for the job at hand</a>.</p>
+
+  <hr>
+
+  <h2>4. Build in self-checks, constraints, and human expertise</h2>
+
+  <p><strong>Make your spec not just a to-do list for the agent, but also a guide for quality control — and don't be afraid to inject your own expertise.</strong></p>
+
+  <p>A good spec for an AI agent anticipates where the AI might go wrong and sets up guardrails. It also takes advantage of what you know (domain knowledge, edge cases, "gotchas") so the AI doesn't operate in a vacuum. Think of the spec as both coach and referee for the AI: it should encourage the right approach and call out fouls.</p>
+
+  <p><strong>Use three-tier boundaries:</strong> The <a href="https://github.blog/ai-and-ml/github-copilot/how-to-write-a-great-agents-md-lessons-from-over-2500-repositories/" target="_blank" rel="noopener">GitHub analysis of 2,500+ agent files</a> found that the most effective specs use a three-tier boundary system rather than a simple list of don'ts. This gives the agent clearer guidance on when to proceed, when to pause, and when to stop:</p>
+
+  <img src="images/always-do.jpg" alt="Three tier boundaries for AI agent specs">
+
+  <ul>
+    <li><strong>✅ Always do:</strong> Actions the agent should take without asking. "Always run tests before commits." "Always follow the naming conventions in the style guide." "Always log errors to the monitoring service."</li>
+    <li><strong>⚠️ Ask first:</strong> Actions that require human approval. "Ask before modifying database schemas." "Ask before adding new dependencies." "Ask before changing CI/CD configuration." This tier catches high-impact changes that might be fine but warrant a human check.</li>
+    <li><strong>🚫 Never do:</strong> Hard stops. "Never commit secrets or API keys." "Never edit node_modules/ or vendor/." "Never remove a failing test without explicit approval." "Never commit secrets" was the single most common helpful constraint in the study.</li>
+  </ul>
+
+  <p>This three-tier approach is more nuanced than a flat list of rules. It acknowledges that some actions are always safe, some need oversight, and some are categorically off-limits.</p>
+
+  <p><strong>Encourage self-verification:</strong> One powerful pattern is to have the agent verify its work against the spec automatically. At the spec/prompt level, you can instruct the AI to double-check: e.g. "After implementing, compare the result with the spec and confirm all requirements are met. List any spec items that are not addressed." This pushes the LLM to reflect on its output relative to the spec, catching omissions.</p>
+
+  <p><strong>LLM-as-a-Judge for subjective checks:</strong> For criteria that are hard to test automatically — code style, readability, adherence to architectural patterns — consider using "LLM-as-a-Judge." This means having a second agent (or a separate prompt) review the first agent's output against your spec's quality guidelines. You might prompt: "Review this code for adherence to our style guide. Flag any violations." This adds a layer of semantic evaluation beyond syntax checks.</p>
+
+  <p><strong>Conformance testing:</strong> Willison advocates building conformance suites — language-independent tests (often YAML-based) that any implementation must pass. These act as a contract: if you're building an API, the conformance suite specifies expected inputs/outputs, and the agent's code must satisfy all cases. This is more rigorous than ad-hoc unit tests because it's derived directly from the spec and can be reused across implementations.</p>
+
+  <p><strong>Leverage testing in the spec:</strong> If possible, incorporate a test plan or even actual tests in your spec and prompt flow. Simon Willison noted that having a <a href="https://simonwillison.net/2025/Oct/7/vibe-engineering/" target="_blank" rel="noopener">robust test suite</a> is like giving the agents superpowers — they can validate and iterate quickly when tests fail. You can use a dedicated "<a href="https://10xdevelopers.dev/structured/claude-code-with-subagents/" target="_blank" rel="noopener">test agent</a>" in a subagent setup that takes the spec's criteria and continuously verifies the "code agent's" output.</p>
+
+  <p><strong>Bring your domain knowledge:</strong> Your spec should reflect insights that only an experienced developer or someone with context would know. If a certain library is notoriously tricky, mention pitfalls to avoid. Essentially, pour your mentorship into the spec. This level of detail is what turns an average AI output into a truly robust solution, because you've steered the AI away from common traps.</p>
+
+  <p><strong>Minimalism for simple tasks:</strong> While we advocate thorough specs, part of expertise is knowing when to keep it simple. For relatively simple, isolated tasks, an overbearing spec can actually confuse more than help. A good rule of thumb: adjust spec detail to task complexity. Don't under-spec a hard problem (the agent will flail or go off-track), but don't over-spec a trivial one.</p>
+
+  <p><strong>You remain the exec in the loop:</strong> The spec empowers the agent, but you remain the ultimate quality filter. If the agent produces something that technically meets the spec but doesn't feel right, trust your judgement. The spec is a living artifact in collaboration with the AI, not a one-time contract you can't change.</p>
+
+  <p>Simon Willison humorously likened working with AI agents to "a very weird form of management" and even "getting good results out of a coding agent feels <a href="https://simonwillison.net/2025/Oct/7/vibe-engineering/" target="_blank" rel="noopener">uncomfortably close to managing a human intern</a>". You need to provide clear instructions (the spec), ensure they have the necessary context, and give actionable feedback. If an AI was a "weird digital intern who will absolutely cheat if you give them a chance", the spec and constraints you write are how you prevent that cheating and keep them on task.</p>
+
+  <hr>
+
+  <h2>5. Test, iterate, and evolve the spec (and use the right tools)</h2>
+
+  <p><strong>Think of spec-writing and agent-building as an iterative loop: test early, gather feedback, refine the spec, and leverage tools to automate checks.</strong></p>
+
+  <p>The initial spec is not the end — it's the beginning of a cycle. The best outcomes come when you continually verify the agent's work against the spec and adjust accordingly.</p>
+
+  <img src="images/spec-refine.jpg" alt="Spec iteration loop: Test, Feedback, Refine, Tools">
+
+  <p><strong>Continuous testing:</strong> Don't wait until the end to see if the agent met the spec. After each major milestone or even each function, run tests or at least do quick manual checks. If something fails, update the spec or prompt before proceeding. Automated tests shine here: if you provided tests (or write them as you go), let the agent run them. The results (failures) can then feed back into the next prompt, effectively telling the agent "your output didn't meet spec on X, Y, Z — fix it." This kind of agentic loop (code → test → fix → repeat) is extremely powerful. Always define what "done" means (via tests or criteria) and check for it.</p>
+
+  <p><strong>Iterate on the spec itself:</strong> If you discover that the spec was incomplete or unclear, update the spec document. Then explicitly re-sync the agent with the new spec: "I have updated the spec as follows… Given the updated spec, adjust the plan or refactor the code accordingly." This way the spec remains the single source of truth.</p>
+
+  <p><strong>Utilize context-management and memory tools:</strong> There's a growing ecosystem of tools to help manage AI agent context and knowledge. Retrieval-augmented generation (RAG) is a pattern where the agent can pull in relevant chunks of data from a knowledge base on the fly. If your spec is huge, you could embed sections of it and let the agent retrieve the most relevant parts when needed. There are also frameworks implementing the Model Context Protocol (MCP), which automates feeding the right context to the model based on the current task.</p>
+
+  <p><strong>Parallelize carefully:</strong> Some developers run multiple agent instances in parallel on different tasks. This can speed up development — e.g., one agent generates code while another simultaneously writes tests. If you go this route, ensure the tasks are truly independent or clearly separated to avoid conflicts. This is advanced usage and can be mentally taxing to manage (as Willison admitted, running multiple agents is <a href="https://simonwillison.net/2025/Oct/7/vibe-engineering/" target="_blank" rel="noopener">surprisingly effective, if mentally exhausting</a>!). Start with at most 2–3 agents to keep things manageable.</p>
+
+  <p><strong>Version control and spec locks:</strong> Use Git to track what the agent does. <a href="https://simonwillison.net/2025/Oct/7/vibe-engineering/" target="_blank" rel="noopener">Good version control habits</a> matter even more with AI assistance. Commit the spec file itself to the repo. This not only preserves history, but the agent can even use git diff or blame to understand changes (LLMs are quite capable of reading diffs). By keeping your spec in the repo, you allow both you and the AI to track evolution.</p>
+
+  <p><strong>Cost and speed considerations:</strong> Working with large models and long contexts can be slow and expensive. A practical tip is to use model selection and batching smartly. Perhaps use a cheaper/faster model for initial drafts, and reserve the most capable model for final outputs or complex reasoning. Also consider throttling context size: don't feed 20k tokens if 5k will do. As we discussed, <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" target="_blank" rel="noopener">more tokens can mean diminishing returns</a>.</p>
+
+  <p><strong>Monitor and log everything:</strong> In complex agent workflows, logging the agent's actions and outputs is essential. Reviewing these logs can highlight where the spec or instructions might have been misinterpreted. It's not unlike debugging a program — except the "program" is the conversation/prompt chain.</p>
+
+  <p><strong>Learn and improve:</strong> Finally, treat each project as a learning opportunity to refine your spec-writing skill. The field of AI agents is rapidly evolving, so new best practices (and tools) emerge constantly. Stay updated via blogs (like the ones by Simon Willison, Andrej Karpathy, etc.), and don't hesitate to experiment.</p>
+
+  <p>A spec for an AI agent isn't "write once, done." It's part of a continuous cycle of instructing, verifying, and refining. A good spec, continuously maintained, is your management tool.</p>
+
+  <hr>
+
+  <h2>Avoid common pitfalls</h2>
+
+  <p>Before wrapping up, it's worth calling out anti-patterns that can derail even well-intentioned spec-driven workflows. The <a href="https://github.blog/ai-and-ml/github-copilot/how-to-write-a-great-agents-md-lessons-from-over-2500-repositories/" target="_blank" rel="noopener">GitHub study of 2,500+ agent files</a> revealed a stark divide: "Most agent files fail because they're too vague." Here are the mistakes to avoid:</p>
+
+  <ul>
+    <li><strong>Vague prompts:</strong> "Build me something cool" or "Make it work better" gives the agent nothing to anchor on. Be specific about inputs, outputs, and constraints. "You are a helpful coding assistant" doesn't work. "You are a test engineer who writes tests for React components, follows these examples, and never modifies source code" does.</li>
+    <li><strong>Overlong contexts without summarization:</strong> Dumping 50 pages of documentation into a prompt and hoping the model figures it out rarely works. Use hierarchical summaries or RAG to surface only what's relevant. Context length is not a substitute for context quality.</li>
+    <li><strong>Skipping human review:</strong> Willison has a personal rule: "I won't commit code I couldn't explain to someone else." Just because the agent produced something that passes tests doesn't mean it's correct, secure, or maintainable. Always review critical code paths. The "house of cards" metaphor applies: AI-generated code can look solid but collapse under edge cases you didn't test.</li>
+    <li><strong>Conflating vibe coding with production engineering:</strong> Rapid prototyping with AI ("vibe coding") is great for exploration and throwaway projects. But shipping that code to production without rigorous specs, tests, and review is asking for trouble. Know which mode you're in.</li>
+    <li><strong>Ignoring the "lethal trifecta":</strong> Willison warns of three properties that make AI agents dangerous: speed (they work faster than you can review), non-determinism (same input, different outputs), and cost (encouraging corner-cutting on verification). Your spec and review process must account for all three. Don't let speed outpace your ability to verify.</li>
+    <li><strong>Missing the six core areas:</strong> If your spec doesn't cover commands, testing, project structure, code style, git workflow, and boundaries, you're likely missing something the agent needs. Use the six-area checklist from Section 2 as a sanity check before handing off to the agent.</li>
+  </ul>
+
+  <hr>
+
+  <h2>Conclusion</h2>
+
+  <p>Writing an effective spec for AI coding agents requires solid software engineering principles combined with adaptation to LLM quirks. Start with clarity of purpose and let the AI help expand the plan. Structure the spec like a serious design document — covering the six core areas and integrating it into your toolchain so it becomes an executable artifact, not just prose. Keep the agent's focus tight by feeding it one piece of the puzzle at a time (and consider clever tactics like summary TOCs, subagents, or parallel orchestration to handle big specs). Anticipate pitfalls by including three-tier boundaries (Always/Ask first/Never), self-checks, and conformance tests — essentially, teach the AI how to not fail. And treat the whole process as iterative: use tests and feedback to refine both the spec and the code continuously.</p>
+
+  <p>Follow these guidelines and your AI agent will be far less likely to "break down" under large contexts or wander off into nonsense.</p>
+
+  <p>Happy spec-writing!</p>
+</article>
+</body>
+</html>

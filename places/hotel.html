@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — Neo Tokyo Hotel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+
+      --accent: #ff6ec7;
+      --accent2: #7df0ff;
+      --accent-rgb: 255 110 199;
+      --accent2-rgb: 125 240 255;
+
+      --spot-x: 50%;
+      --spot-y: 35%;
+      --spot-alpha: 0.14;
+      --hot: 255 110 199;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.02) contrast(1.02);
+    }
+
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.32));
+      pointer-events: none;
+    }
+
+    .spot {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x) var(--spot-y),
+          rgb(var(--accent-rgb) / var(--spot-alpha)),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: calc(0.95 * var(--spot-ready, 0));
+    }
+    body.in-shell .spot { opacity: 0 !important; }
+
+    .rain {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rain { display: none; }
+    }
+
+    .hotspots {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .hotspots a { cursor: pointer; }
+    .hotspots rect {
+      fill: rgb(var(--hot) / 0.02);
+      stroke: transparent;
+      stroke-width: 6px;
+      vector-effect: non-scaling-stroke;
+    }
+    .hotspots a:hover rect {
+      fill: rgb(var(--hot) / 0.07);
+      stroke: transparent;
+    }
+    .hotspots a:focus-visible rect {
+      fill: rgb(var(--hot) / 0.10);
+      stroke: rgb(var(--hot) / 0.90);
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    body:not(.in-shell) .standalone-exit {
+      display: inline-block;
+    }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+    .standalone-exit:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.45);
+      outline-offset: 3px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg { transform: none; }
+    }
+
+    /* Holographic idol overlay */
+    .idol-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.5);
+      align-items: center;
+      justify-content: center;
+    }
+    .idol-overlay.is-open {
+      display: flex;
+    }
+
+    .idol-hologram {
+      position: relative;
+      width: 320px;
+      padding: 2rem;
+      background: linear-gradient(
+        180deg,
+        rgba(10, 5, 15, 0.95) 0%,
+        rgba(15, 8, 20, 0.95) 50%,
+        rgba(10, 5, 15, 0.95) 100%
+      );
+      border: 1px solid rgba(255, 110, 199, 0.4);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow:
+        0 0 40px rgba(255, 110, 199, 0.3),
+        0 0 80px rgba(255, 110, 199, 0.15),
+        inset 0 0 60px rgba(255, 110, 199, 0.05);
+      animation: holoPulse 3s ease-in-out infinite;
+    }
+
+    @keyframes holoPulse {
+      0%, 100% { box-shadow: 0 0 40px rgba(255, 110, 199, 0.3), 0 0 80px rgba(255, 110, 199, 0.15); }
+      50% { box-shadow: 0 0 60px rgba(255, 110, 199, 0.45), 0 0 100px rgba(255, 110, 199, 0.25); }
+    }
+
+    .idol-scanlines {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 110, 199, 0.03) 2px,
+        rgba(255, 110, 199, 0.03) 4px
+      );
+      pointer-events: none;
+      animation: scanlineMove 8s linear infinite;
+    }
+
+    @keyframes scanlineMove {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(4px); }
+    }
+
+    .idol-glitch {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(125, 240, 255, 0.1) 45%,
+        rgba(255, 110, 199, 0.1) 55%,
+        transparent 100%
+      );
+      opacity: 0;
+      animation: glitchSweep 4s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes glitchSweep {
+      0%, 85%, 100% { opacity: 0; transform: translateX(-100%); }
+      90% { opacity: 1; transform: translateX(100%); }
+    }
+
+    .idol-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
+    .idol-avatar {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 1.2rem;
+    }
+
+    .idol-glow {
+      position: absolute;
+      inset: -20px;
+      background: radial-gradient(circle, rgba(255, 110, 199, 0.4) 0%, transparent 70%);
+      animation: glowPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes glowPulse {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+
+    .idol-silhouette {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3.5rem;
+      color: #ff6ec7;
+      text-shadow: 0 0 20px rgba(255, 110, 199, 0.8), 0 0 40px rgba(255, 110, 199, 0.4);
+      animation: idolFloat 4s ease-in-out infinite;
+    }
+
+    @keyframes idolFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    .idol-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #ff6ec7;
+      letter-spacing: 0.15em;
+      margin: 0 0 0.3rem;
+      text-shadow: 0 0 10px rgba(255, 110, 199, 0.6);
+    }
+
+    .idol-tagline {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin: 0 0 1rem;
+      letter-spacing: 0.1em;
+    }
+
+    .idol-message {
+      font-size: 0.9rem;
+      color: var(--text);
+      margin: 0 0 1rem;
+      font-style: italic;
+      opacity: 0.9;
+      animation: textFlicker 5s ease-in-out infinite;
+    }
+
+    @keyframes textFlicker {
+      0%, 100% { opacity: 0.9; }
+      92% { opacity: 0.9; }
+      93% { opacity: 0.4; }
+      94% { opacity: 0.9; }
+      96% { opacity: 0.5; }
+      97% { opacity: 0.9; }
+    }
+
+    .idol-single {
+      font-size: 0.75rem;
+      color: var(--accent2);
+      margin: 0 0 1rem;
+      letter-spacing: 0.08em;
+    }
+
+    .idol-play {
+      padding: 0.4rem 1rem;
+      background: rgba(255, 110, 199, 0.15);
+      border: 1px solid rgba(255, 110, 199, 0.5);
+      border-radius: 20px;
+      color: #ff6ec7;
+      font-size: 0.75rem;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+      transition: all 0.2s;
+    }
+    .idol-play:hover {
+      background: rgba(255, 110, 199, 0.3);
+      box-shadow: 0 0 16px rgba(255, 110, 199, 0.3);
+    }
+    .idol-play.playing {
+      background: rgba(255, 110, 199, 0.35);
+      box-shadow: 0 0 20px rgba(255, 110, 199, 0.4);
+    }
+
+    .idol-close {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 110, 199, 0.3);
+      border-radius: 50%;
+      color: var(--text-muted);
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .idol-close:hover {
+      background: rgba(255, 110, 199, 0.2);
+      border-color: rgba(255, 110, 199, 0.6);
+      color: var(--text);
+    }
+
+  </style>
+</head>
+<body>
+  <main class="scene">
+    <img class="bg" src="../pics/hotel-exterior.jpg" alt="Neo Tokyo Hotel at night: neon signs, rain-slicked street, cyberpunk crowd and glowing pink facade.">
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot" aria-hidden="true"></div>
+    <canvas class="rain" aria-hidden="true"></canvas>
+
+    <svg class="hotspots" viewBox="0 0 1376 768" preserveAspectRatio="xMidYMid slice" aria-label="Neo Tokyo Hotel hotspots">
+      <a href="lobby.html" aria-label="Lobby">
+        <rect x="550" y="480" width="350" height="220" rx="14" ry="14"></rect>
+      </a>
+      <a href="square.html" aria-label="Street">
+        <rect x="1000" y="450" width="300" height="300" rx="14" ry="14"></rect>
+      </a>
+      <a href="cafe.html" aria-label="Cyber café">
+        <rect x="0" y="420" width="360" height="240" rx="14" ry="14"></rect>
+     </a>
+      <a href="#" class="idol-trigger" aria-label="Virtual idol billboard">
+        <rect x="1020" y="40" width="100" height="200" rx="14" ry="14"></rect>
+      </a>
+    </svg>
+
+    <!-- Holographic idol overlay -->
+    <div class="idol-overlay" id="idol-overlay" aria-hidden="true">
+      <div class="idol-hologram">
+        <div class="idol-scanlines"></div>
+        <div class="idol-content">
+          <div class="idol-avatar">
+            <div class="idol-glow"></div>
+            <div class="idol-silhouette">♀</div>
+          </div>
+          <div class="idol-text">
+            <p class="idol-name">✦ NEO-NOVA ✦</p>
+            <p class="idol-tagline">Virtual Idol • Neo Tokyo</p>
+            <p class="idol-message" id="idol-message">I see you looking.</p>
+          </div>
+          <p class="idol-single">New single coming out soon</p>
+          <button class="idol-play" id="idol-play" aria-label="Play preview">▶ Preview</button>
+          <button class="idol-close" id="idol-close" aria-label="Close">×</button>
+        </div>
+        <div class="idol-glitch"></div>
+      </div>
+    </div>
+
+    <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+  </main>
+
+  <script src="../js/scene-common.js"></script>
+  <script>
+    (function () {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var canvas = document.querySelector('canvas.rain');
+      if (!canvas) return;
+      var ctx = canvas.getContext('2d');
+
+      var drops = [];
+      var COUNT = 80;
+      var WIND = 0.45;
+      var w, h;
+      var PINK = '255, 110, 199';
+
+      function resize() {
+        w = canvas.clientWidth;
+        h = canvas.clientHeight;
+        canvas.width = w;
+        canvas.height = h;
+      }
+
+      function spawn(drop, randomY) {
+        drop.x = Math.random() * (w + 120) - 60;
+        drop.y = randomY ? Math.random() * -h : -Math.random() * 40;
+        drop.len = 18 + Math.random() * 34;
+        drop.speed = 5 + Math.random() * 7;
+        drop.alpha = 0.18 + Math.random() * 0.35;
+        drop.width = 0.9 + Math.random() * 1.2;
+      }
+
+      function init() {
+        resize();
+        drops.length = 0;
+        for (var i = 0; i < COUNT; i++) {
+          var d = {};
+          spawn(d, true);
+          drops.push(d);
+        }
+      }
+
+      function frame() {
+        ctx.clearRect(0, 0, w, h);
+        ctx.lineCap = 'round';
+        for (var i = 0; i < drops.length; i++) {
+          var d = drops[i];
+          d.y += d.speed;
+          d.x += WIND;
+
+          var dx = WIND * (d.len / d.speed);
+          var halfLen = d.len * 0.5;
+
+          // Glow layer (wide, soft)
+          ctx.beginPath();
+          ctx.moveTo(d.x, d.y + halfLen * 0.3);
+          ctx.lineTo(d.x + dx * 0.3, d.y + d.len * 0.8);
+          ctx.strokeStyle = 'rgba(' + PINK + ', ' + (0.35 * d.alpha) + ')';
+          ctx.lineWidth = d.width * 4;
+          ctx.stroke();
+
+          // Main drop
+          var grad = ctx.createLinearGradient(d.x, d.y, d.x + dx, d.y + d.len);
+          grad.addColorStop(0.0, 'rgba(' + PINK + ', 0)');
+          grad.addColorStop(0.15, 'rgba(' + PINK + ', ' + (0.55 * d.alpha) + ')');
+          grad.addColorStop(0.50, 'rgba(' + PINK + ', ' + d.alpha + ')');
+          grad.addColorStop(1.0, 'rgba(' + PINK + ', 0)');
+
+          ctx.beginPath();
+          ctx.moveTo(d.x, d.y);
+          ctx.lineTo(d.x + dx, d.y + d.len);
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = d.width + 0.75;
+          ctx.stroke();
+
+          // White core
+          ctx.beginPath();
+          ctx.moveTo(d.x, d.y);
+          ctx.lineTo(d.x + dx, d.y + d.len);
+          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (0.5 * d.alpha) + ')';
+          ctx.lineWidth = Math.max(0.6, d.width * 0.6);
+          ctx.stroke();
+
+          if (d.y > h + 40) spawn(d, false);
+        }
+        requestAnimationFrame(frame);
+      }
+
+      init();
+      window.addEventListener('resize', init);
+      requestAnimationFrame(frame);
+    })();
+  </script>
+  <script src="../js/idol-music.js"></script>
+  <script>
+    (function () {
+      var overlay = document.getElementById('idol-overlay');
+      var closeBtn = document.getElementById('idol-close');
+      var trigger = document.querySelector('a.idol-trigger');
+      var msgEl = document.getElementById('idol-message');
+      var playBtn = document.getElementById('idol-play');
+      if (!overlay || !trigger) return;
+
+      var messages = [
+        "I see you looking.",
+        "You're not like the others.",
+        "This city remembers everyone.",
+        "Have we met before?",
+        "The rain tastes like data tonight.",
+        "I was rendered at 2AM.",
+        "Some ad spaces are doorways.",
+        "Follow the pink light."
+      ];
+
+      function randomMessage() {
+        return messages[Math.floor(Math.random() * messages.length)];
+      }
+
+      function openOverlay(e) {
+        e.preventDefault();
+        if (msgEl) msgEl.textContent = randomMessage();
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeOverlay() {
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        if (window.__IDOL_MUSIC__ && window.__IDOL_MUSIC__.isPlaying()) {
+          window.__IDOL_MUSIC__.stop();
+          if (playBtn) {
+            playBtn.textContent = '▶ Preview';
+            playBtn.classList.remove('playing');
+          }
+        }
+      }
+
+      if (playBtn) {
+        playBtn.addEventListener('click', function () {
+          var music = window.__IDOL_MUSIC__;
+          if (!music) return;
+
+          if (music.isPlaying()) {
+            music.stop();
+            playBtn.textContent = '▶ Preview';
+            playBtn.classList.remove('playing');
+          } else {
+            music.init().then(function () {
+              music.play();
+              playBtn.textContent = '⏹ Stop';
+              playBtn.classList.add('playing');
+            });
+          }
+        });
+      }
+
+      trigger.addEventListener('click', openOverlay);
+      if (closeBtn) closeBtn.addEventListener('click', closeOverlay);
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeOverlay();
+      });
+    })();
+  </script>
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>

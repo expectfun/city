@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — Bubble Sort</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+      --accent-rgb: 125 240 255;
+      --accent2-rgb: 255 197 109;
+      --hot: 0 255 106;
+
+      --cyan: #5de8d0;
+      --purple: #c084ff;
+      --danger: #ff5d5d;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Mono", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, monospace;
+      color: var(--cyan);
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.02) contrast(1.02);
+    }
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.30));
+      pointer-events: none;
+    }
+
+    .crt::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.15) 0px,
+          rgba(0, 0, 0, 0.15) 1px,
+          transparent 1px,
+          transparent 2px
+        );
+      pointer-events: none;
+      z-index: 10;
+    }
+    .crt::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.4) 100%);
+      pointer-events: none;
+      z-index: 11;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .terminal-screen {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(96vw, 1200px);
+      height: min(96vh, 820px);
+      background: rgba(6, 14, 20, 0.95);
+      border: 1px solid rgba(93, 232, 208, 0.25);
+      border-radius: 8px;
+      box-shadow:
+        0 0 40px rgba(93, 232, 208, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .terminal-header {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid rgba(93, 232, 208, 0.15);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+    }
+    .terminal-header span { opacity: 0.7; }
+    .terminal-header .close-btn {
+      width: 1.4rem;
+      height: 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 0.75rem;
+      color: var(--cyan);
+      text-decoration: none;
+      font-size: 1.1rem;
+      line-height: 1;
+      opacity: 0.6;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .terminal-header .close-btn:hover {
+      opacity: 1;
+      background: rgba(255, 93, 93, 0.15);
+      border-color: rgba(255, 93, 93, 0.4);
+      color: var(--danger);
+    }
+
+    .terminal-body {
+      flex: 1;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .intro {
+      text-align: center;
+      padding: 0.25rem 0;
+    }
+    .intro h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.1rem;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+      text-shadow: 0 0 15px rgba(93, 232, 208, 0.3);
+      color: var(--cyan);
+    }
+    .intro .subtitle {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin: 0;
+      color: var(--text-muted);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    .panel {
+      background: rgba(93, 232, 208, 0.05);
+      border: 1px solid rgba(93, 232, 208, 0.15);
+      border-radius: 6px;
+      padding: 1rem;
+    }
+    .panel h3 {
+      margin: 0 0 1rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      opacity: 0.7;
+      font-weight: 400;
+      color: var(--text-muted);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1.05fr;
+      gap: 1rem;
+      min-height: 0;
+      flex: 1;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .col {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 0;
+    }
+
+    .bars {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 1fr;
+      align-items: end;
+      gap: 6px;
+      height: 280px;
+      padding: 12px;
+      background: rgba(6, 10, 14, 0.6);
+      border-radius: 6px;
+      border: 1px solid rgba(93, 232, 208, 0.12);
+    }
+    .bar {
+      position: relative;
+      width: 100%;
+      height: 30%;
+      border-radius: 6px 6px 4px 4px;
+      background: linear-gradient(180deg, rgba(93, 232, 208, 0.95), rgba(93, 232, 208, 0.35));
+      box-shadow: 0 0 18px rgba(93, 232, 208, 0.14);
+      transition: transform 0.12s ease, filter 0.12s ease, background 0.12s ease;
+      filter: saturate(1.05);
+    }
+    .bar[data-state="compare"] {
+      background: linear-gradient(180deg, rgba(255, 197, 109, 0.95), rgba(255, 197, 109, 0.35));
+      box-shadow: 0 0 18px rgba(255, 197, 109, 0.14);
+    }
+    .bar[data-state="swap"] {
+      background: linear-gradient(180deg, rgba(192, 132, 255, 0.95), rgba(192, 132, 255, 0.35));
+      box-shadow: 0 0 18px rgba(192, 132, 255, 0.16);
+      transform: translateY(-2px);
+    }
+    .bar[data-state="done"] {
+      background: linear-gradient(180deg, rgba(125, 240, 255, 0.95), rgba(125, 240, 255, 0.25));
+      box-shadow: 0 0 16px rgba(125, 240, 255, 0.10);
+      filter: saturate(0.95);
+    }
+    .bar .val {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 4px;
+      text-align: center;
+      font-size: 0.7rem;
+      color: rgba(232, 238, 246, 0.7);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(232, 238, 246, 0.18);
+      background: rgb(255 255 255 / 0.04);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 0.45rem 0.7rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+      font-family: inherit;
+    }
+    .btn:hover {
+      background: rgb(var(--accent-rgb) / 0.10);
+      border-color: rgb(var(--accent-rgb) / 0.40);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary {
+      border-color: rgba(93, 232, 208, 0.35);
+      background: rgba(93, 232, 208, 0.12);
+      color: var(--cyan);
+    }
+    .btn.primary:hover {
+      border-color: rgba(93, 232, 208, 0.55);
+      background: rgba(93, 232, 208, 0.18);
+      box-shadow: 0 0 0 3px rgba(93, 232, 208, 0.12);
+    }
+    .controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.78rem;
+      color: rgba(232, 238, 246, 0.66);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    .controls input[type="range"] {
+      width: 170px;
+      height: 4px;
+      background: rgba(93, 232, 208, 0.15);
+      border-radius: 2px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .controls input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--cyan);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(93, 232, 208, 0.5);
+    }
+    .controls input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: var(--cyan);
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 10px rgba(93, 232, 208, 0.5);
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      font-size: 0.78rem;
+      color: rgba(232, 238, 246, 0.62);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      margin-top: 0.65rem;
+    }
+    .meta strong { color: rgba(232, 238, 246, 0.86); font-weight: 600; }
+
+    .editor {
+      display: grid;
+      gap: 0.5rem;
+    }
+    .editor textarea {
+      width: 100%;
+      min-height: 84px;
+      resize: vertical;
+      background: rgba(93, 232, 208, 0.06);
+      border: 1px solid rgba(93, 232, 208, 0.18);
+      border-radius: 6px;
+      padding: 0.6rem;
+      color: rgba(232, 238, 246, 0.88);
+      font-family: inherit;
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
+    .editor textarea:focus {
+      outline: none;
+      border-color: rgba(93, 232, 208, 0.45);
+      box-shadow: 0 0 0 3px rgba(93, 232, 208, 0.12);
+    }
+    .code {
+      margin: 0;
+      padding: 0.75rem 0.85rem;
+      border-radius: 6px;
+      background: rgba(6, 10, 14, 0.65);
+      border: 1px solid rgba(93, 232, 208, 0.12);
+      overflow: auto;
+      color: rgba(232, 238, 246, 0.86);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+    .code .tok-kw { color: rgba(125, 240, 255, 0.95); }
+    .code .tok-num { color: rgba(255, 197, 109, 0.92); }
+    .code .tok-op { color: rgba(232, 238, 246, 0.88); }
+    .code .tok-fn { color: rgba(93, 232, 208, 0.95); }
+    .code .tok-id { color: rgba(232, 238, 246, 0.84); }
+    .code .tok-br { color: rgba(232, 238, 246, 0.70); }
+    .code .tok-com { color: rgba(232, 238, 246, 0.45); font-style: italic; }
+    .code__lang {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-bottom: 0.55rem;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(232, 238, 246, 0.60);
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    .code__lang::before {
+      content: "JS";
+      display: inline-grid;
+      place-items: center;
+      width: 1.6rem;
+      height: 1.1rem;
+      border-radius: 6px;
+      background: rgba(125, 240, 255, 0.12);
+      border: 1px solid rgba(125, 240, 255, 0.18);
+      color: rgba(125, 240, 255, 0.95);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      text-transform: none;
+      font-size: 0.68rem;
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    body:not(.in-shell) .standalone-exit { display: inline-block; }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <script>if (window.self !== window.top) document.body.classList.add('in-shell');</script>
+  <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+
+  <main class="scene">
+    <img class="bg" src="../pics/rooftop-main.jpg" alt="Rainy cyberpunk rooftop with Web3 portal.">
+    <div class="vignette" aria-hidden="true"></div>
+
+    <div class="overlay crt">
+      <div class="terminal-screen">
+        <div class="terminal-header">
+          <span>SORTING_TERMINAL_v1.0 // Bubble Sort</span>
+          <a href="../places/rooftop.html?viz=1" class="close-btn" aria-label="Back to rooftop" title="Back">×</a>
+        </div>
+        <div class="terminal-body">
+          <div class="intro">
+            <h1>Bubble Sort</h1>
+            <p class="subtitle">Compare neighbors and swap. Watch the array bubble into order.</p>
+          </div>
+
+          <div class="grid">
+            <div class="col">
+              <div class="panel">
+                <h3>Controls</h3>
+                <div class="controls">
+                  <button type="button" class="btn primary" id="next">Next</button>
+                  <button type="button" class="btn" id="play">▶ Play</button>
+                  <button type="button" class="btn" id="reset">Reset</button>
+                  <button type="button" class="btn" id="random">Random</button>
+                  <label>Speed <input type="range" id="speed" min="0" max="100" value="55"></label>
+                </div>
+                <div class="meta">
+                  <span><strong id="pass">0</strong> pass</span>
+                  <span><strong id="compare">0</strong> comparisons</span>
+                  <span><strong id="swap">0</strong> swaps</span>
+                </div>
+              </div>
+
+              <div class="panel">
+                <h3>Array</h3>
+                <div class="bars" id="bars" aria-label="Array visualization"></div>
+              </div>
+            </div>
+
+            <div class="col">
+              <div class="panel">
+                <h3>Edit array</h3>
+                <div class="editor">
+                  <textarea id="input" spellcheck="false">5, 1, 4, 2, 8, 3, 7, 6</textarea>
+                  <div class="controls">
+                    <button type="button" class="btn" id="apply">Apply</button>
+                    <button type="button" class="btn" id="shuffle">Shuffle</button>
+                  </div>
+                  <div class="meta" style="margin-top:0">
+                    <span>Format: comma/space separated numbers</span>
+                    <span>Size: <strong id="size">8</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel">
+                <h3>Algorithm</h3>
+                <div class="code__lang">JavaScript example</div>
+                <pre class="code" aria-label="Bubble sort code (JavaScript)"><code><span class="tok-kw">for</span> (<span class="tok-kw">let</span> <span class="tok-id">i</span> <span class="tok-op">=</span> <span class="tok-num">0</span>; <span class="tok-id">i</span> <span class="tok-op">&lt;</span> <span class="tok-id">n</span> <span class="tok-op">-</span> <span class="tok-num">1</span>; <span class="tok-id">i</span><span class="tok-op">++</span>) <span class="tok-br">{</span>
+  <span class="tok-kw">for</span> (<span class="tok-kw">let</span> <span class="tok-id">j</span> <span class="tok-op">=</span> <span class="tok-num">0</span>; <span class="tok-id">j</span> <span class="tok-op">&lt;</span> <span class="tok-id">n</span> <span class="tok-op">-</span> <span class="tok-num">1</span> <span class="tok-op">-</span> <span class="tok-id">i</span>; <span class="tok-id">j</span><span class="tok-op">++</span>) <span class="tok-br">{</span>
+    <span class="tok-kw">if</span> (<span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span><span class="tok-br">]</span> <span class="tok-op">&gt;</span> <span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span> <span class="tok-op">+</span> <span class="tok-num">1</span><span class="tok-br">]</span>) <span class="tok-br">{</span>
+      <span class="tok-br">[</span><span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span><span class="tok-br">]</span>, <span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span> <span class="tok-op">+</span> <span class="tok-num">1</span><span class="tok-br">]</span><span class="tok-br">]</span> <span class="tok-op">=</span> <span class="tok-br">[</span><span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span> <span class="tok-op">+</span> <span class="tok-num">1</span><span class="tok-br">]</span>, <span class="tok-id">arr</span><span class="tok-br">[</span><span class="tok-id">j</span><span class="tok-br">]</span><span class="tok-br">]</span>;
+    <span class="tok-br">}</span>
+  <span class="tok-br">}</span>
+<span class="tok-br">}</span></code></pre>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      root.dataset.theme = 'dark';
+
+      var elBars = document.getElementById('bars');
+      var elPlay = document.getElementById('play');
+      var elNext = document.getElementById('next');
+      var elReset = document.getElementById('reset');
+      var elRandom = document.getElementById('random');
+      var elSpeed = document.getElementById('speed');
+      var elInput = document.getElementById('input');
+      var elApply = document.getElementById('apply');
+      var elShuffle = document.getElementById('shuffle');
+      var elPass = document.getElementById('pass');
+      var elCompare = document.getElementById('compare');
+      var elSwap = document.getElementById('swap');
+      var elSize = document.getElementById('size');
+      if (!elBars || !elPlay || !elNext || !elReset || !elRandom || !elSpeed || !elInput || !elApply || !elShuffle || !elPass || !elCompare || !elSwap || !elSize) return;
+
+      var base = [];
+      var arr = [];
+      var n = 0;
+      var i = 0;
+      var j = 0;
+      var compareCount = 0;
+      var swapCount = 0;
+      var passCount = 0;
+      var running = false;
+      var timer = 0;
+      var bars = [];
+      var phase = 'compare'; // 'compare' -> show comparison, 'resolve' -> swap/advance
+      var pendingSwap = false;
+      var animating = false;
+
+      function clampSize(x) { return Math.max(2, Math.min(24, x)); }
+
+      function parseArray(text) {
+        var parts = (text || '').split(/[\s,]+/).filter(Boolean);
+        var nums = [];
+        for (var k = 0; k < parts.length; k++) {
+          var v = Number(parts[k]);
+          if (!Number.isFinite(v)) continue;
+          nums.push(Math.round(v));
+        }
+        nums = nums.slice(0, 24);
+        if (nums.length < 2) nums = [5, 1, 4, 2, 8, 3, 7, 6];
+        return nums;
+      }
+
+      function randomArray(size) {
+        var s = clampSize(size || 10);
+        var out = [];
+        for (var k = 0; k < s; k++) out.push(1 + Math.floor(Math.random() * 99));
+        return out;
+      }
+
+      function shuffleInPlace(a) {
+        for (var k = a.length - 1; k > 0; k--) {
+          var r = Math.floor(Math.random() * (k + 1));
+          var t = a[k]; a[k] = a[r]; a[r] = t;
+        }
+      }
+
+      function setButtonState() {
+        elPlay.textContent = running ? '⏸ Pause' : '▶ Play';
+        elNext.disabled = running;
+        elApply.disabled = running;
+        elShuffle.disabled = running;
+      }
+
+      function speedMs() {
+        var v = parseInt(elSpeed.value, 10);
+        if (!Number.isFinite(v)) v = 55;
+        var t = 1 - (Math.max(0, Math.min(100, v)) / 100);
+        return Math.round(30 + 420 * (t * t));
+      }
+
+      function clearStates() {
+        for (var k = 0; k < bars.length; k++) bars[k].dataset.state = '';
+      }
+
+      function renderBars() {
+        elBars.innerHTML = '';
+        bars = [];
+        var maxV = 1;
+        for (var k = 0; k < arr.length; k++) maxV = Math.max(maxV, arr[k]);
+        for (var idx = 0; idx < arr.length; idx++) {
+          var bar = document.createElement('div');
+          bar.className = 'bar';
+          var h = (arr[idx] / maxV) * 100;
+          bar.style.height = Math.max(6, h) + '%';
+          var lab = document.createElement('div');
+          lab.className = 'val';
+          lab.textContent = String(arr[idx]);
+          bar.appendChild(lab);
+          elBars.appendChild(bar);
+          bars.push(bar);
+        }
+        elSize.textContent = String(arr.length);
+      }
+
+      function renderMeta() {
+        elCompare.textContent = String(compareCount);
+        elSwap.textContent = String(swapCount);
+        elPass.textContent = String(passCount);
+      }
+
+      function stop() {
+        if (timer) { window.clearTimeout(timer); timer = 0; }
+      }
+
+      function resetToBase() {
+        arr = base.slice();
+        n = arr.length;
+        i = 0; j = 0;
+        compareCount = 0;
+        swapCount = 0;
+        passCount = 0;
+        phase = 'compare';
+        pendingSwap = false;
+        animating = false;
+        running = false;
+        stop();
+        renderBars();
+        clearStates();
+        markDoneTail();
+        renderMeta();
+        setButtonState();
+      }
+
+      function setBase(newBase) {
+        base = newBase.slice();
+        elInput.value = base.join(', ');
+        resetToBase();
+      }
+
+      function markDoneTail() {
+        var doneFrom = n - i;
+        for (var idx = 0; idx < bars.length; idx++) {
+          if (idx >= doneFrom) bars[idx].dataset.state = 'done';
+        }
+      }
+
+      function ensurePassPosition() {
+        if (i >= n - 1) return false;
+        if (j < n - 1 - i) return true;
+        i++;
+        j = 0;
+        passCount++;
+        phase = 'compare';
+        pendingSwap = false;
+        return i < n - 1;
+      }
+
+      function markSortedIfDone() {
+        if (i < n - 1) return;
+        clearStates();
+        for (var idx = 0; idx < bars.length; idx++) bars[idx].dataset.state = 'done';
+      }
+
+      function animateSwapAt(idx) {
+        if (animating) return Promise.resolve(false);
+        animating = true;
+        var aEl = bars[idx];
+        var bEl = bars[idx + 1];
+        if (!aEl || !bEl) {
+          animating = false;
+          return Promise.resolve(false);
+        }
+
+        aEl.dataset.state = 'swap';
+        bEl.dataset.state = 'swap';
+
+        var aBefore = aEl.getBoundingClientRect();
+        var bBefore = bEl.getBoundingClientRect();
+
+        // Swap DOM nodes (b before a)
+        elBars.insertBefore(bEl, aEl);
+        bars = Array.prototype.slice.call(elBars.children);
+
+        var aAfter = aEl.getBoundingClientRect();
+        var bAfter = bEl.getBoundingClientRect();
+
+        var aDx = aBefore.left - aAfter.left;
+        var bDx = bBefore.left - bAfter.left;
+
+        aEl.style.transition = 'none';
+        bEl.style.transition = 'none';
+        aEl.style.transform = 'translateX(' + aDx + 'px)';
+        bEl.style.transform = 'translateX(' + bDx + 'px)';
+
+        // Force reflow
+        aEl.offsetHeight;
+
+        return new Promise(function (resolve) {
+          var done = 0;
+          var finished = false;
+          function finish(ok) {
+            if (finished) return;
+            finished = true;
+            aEl.style.transition = '';
+            bEl.style.transition = '';
+            aEl.style.transform = '';
+            bEl.style.transform = '';
+            animating = false;
+            resolve(ok);
+          }
+          function onEnd() {
+            done++;
+            if (done >= 2) finish(true);
+          }
+
+          aEl.addEventListener('transitionend', onEnd, { once: true });
+          bEl.addEventListener('transitionend', onEnd, { once: true });
+
+          requestAnimationFrame(function () {
+            aEl.style.transition = 'transform 180ms ease';
+            bEl.style.transition = 'transform 180ms ease';
+            aEl.style.transform = 'translateX(0px)';
+            bEl.style.transform = 'translateX(0px)';
+          });
+
+          window.setTimeout(function () { finish(true); }, 260);
+        });
+      }
+
+      function nextAction() {
+        if (animating) return Promise.resolve(true);
+
+        if (i >= n - 1) {
+          markSortedIfDone();
+          renderMeta();
+          return Promise.resolve(false);
+        }
+
+        if (!ensurePassPosition()) {
+          markSortedIfDone();
+          renderMeta();
+          return Promise.resolve(false);
+        }
+
+        clearStates();
+        markDoneTail();
+
+        if (phase === 'compare') {
+          bars[j].dataset.state = 'compare';
+          bars[j + 1].dataset.state = 'compare';
+          compareCount++;
+          pendingSwap = arr[j] > arr[j + 1];
+          phase = 'resolve';
+          renderMeta();
+          return Promise.resolve(true);
+        }
+
+        // resolve phase: swap if needed, otherwise advance
+        if (pendingSwap) {
+          var tmp = arr[j]; arr[j] = arr[j + 1]; arr[j + 1] = tmp;
+          swapCount++;
+          var curJ = j;
+          pendingSwap = false;
+          phase = 'compare';
+          return animateSwapAt(curJ).then(function () {
+            // keep "done tail" and highlight context after animation
+            clearStates();
+            markDoneTail();
+            j++;
+            ensurePassPosition();
+            renderMeta();
+            return true;
+          });
+        }
+
+        pendingSwap = false;
+        phase = 'compare';
+        j++;
+        ensurePassPosition();
+        renderMeta();
+        return Promise.resolve(true);
+      }
+
+      function tick() {
+        if (!running) return;
+        nextAction().then(function (cont) {
+          if (!running) return;
+          if (!cont) {
+            running = false;
+            setButtonState();
+            return;
+          }
+          timer = window.setTimeout(tick, speedMs());
+        });
+      }
+
+      function play() {
+        if (running) return;
+        running = true;
+        setButtonState();
+        tick();
+      }
+      function pause() {
+        running = false;
+        setButtonState();
+        stop();
+      }
+
+      elPlay.addEventListener('click', function () { running ? pause() : play(); });
+      elNext.addEventListener('click', function () { nextAction(); });
+      elReset.addEventListener('click', function () { resetToBase(); });
+      elRandom.addEventListener('click', function () { setBase(randomArray(arr.length || 10)); });
+      elShuffle.addEventListener('click', function () { var tmp = base.slice(); shuffleInPlace(tmp); setBase(tmp); });
+      elApply.addEventListener('click', function () { setBase(parseArray(elInput.value)); });
+      elSpeed.addEventListener('input', function () {
+        if (!running) return;
+        stop();
+        timer = window.setTimeout(tick, speedMs());
+      });
+
+      setBase(parseArray(elInput.value));
+    })();
+  </script>
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>

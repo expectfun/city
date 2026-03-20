@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — Map</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+
+      --accent: #7df0ff;
+      --accent2: #ff6ec7;
+      --accent-rgb: 125 240 255;
+      --accent2-rgb: 255 110 199;
+
+      --spot-x: 53%;
+      --spot-y: 54%;
+      --spot-alpha: 0.16;
+      --hot: 125 240 255;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      filter: saturate(1.02) contrast(1.02);
+    }
+
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.32));
+      pointer-events: none;
+    }
+
+    .spot {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x) var(--spot-y),
+          rgb(var(--accent-rgb) / var(--spot-alpha)),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: calc(0.95 * var(--spot-ready, 0));
+    }
+    body.in-shell .spot { opacity: 0 !important; }
+
+    .hotspots {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .hotspots a { cursor: pointer; }
+    .hotspots rect {
+      fill: rgb(var(--hot) / 0.02);
+      stroke: transparent;
+      stroke-width: 6px;
+      vector-effect: non-scaling-stroke;
+    }
+    .hotspots a:hover rect {
+      fill: rgb(var(--hot) / 0.07);
+      stroke: transparent;
+    }
+    .hotspots a:focus-visible rect {
+      fill: rgb(var(--hot) / 0.10);
+      stroke: rgb(var(--hot) / 0.90);
+    }
+    .hotspots a.secret-hotspot {
+      pointer-events: none;
+    }
+    .hotspots a.secret-hotspot rect {
+      fill: transparent;
+      stroke: transparent;
+    }
+    body.uv-on .hotspots a.secret-hotspot {
+      pointer-events: auto;
+    }
+    body.uv-on .hotspots a.secret-hotspot rect {
+      fill: rgb(var(--accent2-rgb) / 0.10);
+      stroke: rgb(var(--accent2-rgb) / 0.45);
+      stroke-width: 4px;
+      stroke-dasharray: 8 6;
+    }
+    .hotspots a.secret-hotspot:hover rect {
+      fill: rgb(var(--accent2-rgb) / 0.16);
+      stroke: rgb(var(--accent2-rgb) / 0.75);
+    }
+    .hotspots a.secret-hotspot:focus-visible rect {
+      fill: rgb(var(--accent2-rgb) / 0.22);
+      stroke: rgb(var(--accent2-rgb) / 0.95);
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    body:not(.in-shell) .standalone-exit {
+      display: inline-block;
+    }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+    .standalone-exit:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.45);
+      outline-offset: 3px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg { transform: none; }
+    }
+
+    .map-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      background: transparent;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.25rem;
+    }
+    .map-overlay.is-open { display: flex; }
+
+    .map-card {
+      position: relative;
+      width: min(980px, 100%);
+      border-radius: 14px;
+      background: rgb(9 14 20 / 0.62);
+      border: 1px solid var(--border);
+      box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.10), 0 24px 60px rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      overflow: hidden;
+    }
+
+    .map-overlay__close {
+      position: absolute;
+      top: 0.65rem;
+      right: 0.65rem;
+      z-index: 2;
+      padding: 0.45rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgb(9 14 20 / 0.62);
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .map-overlay__close:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+    .map-overlay__close:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.45);
+      outline-offset: 3px;
+    }
+
+    .city-graph {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 0;
+      border: none;
+      background:
+        radial-gradient(900px circle at 55% 30%, rgb(var(--accent-rgb) / 0.10), transparent 60%),
+        radial-gradient(700px circle at 25% 70%, rgb(var(--accent2-rgb) / 0.10), transparent 60%),
+        linear-gradient(180deg, rgb(6 10 15 / 0.42), rgb(6 10 15 / 0.22));
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.03);
+    }
+    .city-graph .edge {
+      stroke: rgb(var(--accent-rgb) / 0.30);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+    }
+    .city-graph .edge.secondary { stroke: rgb(var(--accent2-rgb) / 0.25); }
+    .city-graph .edge.core { stroke: rgb(var(--accent-rgb) / 0.55); }
+    .city-graph .node-ring {
+      fill: rgb(0 0 0 / 0.20);
+      stroke: rgb(var(--accent-rgb) / 0.75);
+      stroke-width: 2.5;
+    }
+    .city-graph .node-core {
+      fill: rgb(var(--accent-rgb) / 0.10);
+      stroke: rgb(var(--accent-rgb) / 0.35);
+      stroke-width: 1.5;
+    }
+    .city-graph a:hover .node-ring { stroke: rgb(var(--accent-rgb) / 0.95); }
+    .city-graph a:focus-visible .node-ring { stroke: rgb(var(--accent-rgb) / 1); }
+    .city-graph .node-secondary .node-ring { stroke: rgb(var(--accent2-rgb) / 0.55); }
+    .city-graph .node-secondary .node-core { fill: rgb(var(--accent2-rgb) / 0.07); stroke: rgb(var(--accent2-rgb) / 0.25); }
+    .city-graph .node-current .node-ring { stroke: rgb(var(--accent-rgb) / 1); stroke-width: 3.5; }
+    .city-graph .node-current .node-core { fill: rgb(var(--accent-rgb) / 0.16); }
+    .city-graph text {
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      fill: rgb(232 238 246 / 0.90);
+      font-size: 18px;
+      letter-spacing: 0.02em;
+    }
+    .city-graph .label-muted { fill: rgb(232 238 246 / 0.60); font-size: 14px; }
+
+    @media (max-width: 640px) {
+      .map-overlay { padding: 1rem 0.75rem; }
+      .map-overlay__inner { padding: 1rem; }
+      .city-graph text { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <script>if (window.self !== window.top) document.body.classList.add('in-shell');</script>
+  <main class="scene">
+    <img class="bg" src="../pics/map-table.jpg" alt="AR map scene: futuristic interior with holographic city map table and neon-lit displays.">
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot" aria-hidden="true"></div>
+
+    <svg class="hotspots" viewBox="0 0 1376 768" preserveAspectRatio="xMidYMid slice" aria-label="Map hotspots">
+      <a href="cafe.html" aria-label="Back to cyber café">
+        <rect x="0" y="380" width="320" height="360" rx="14" ry="14"></rect>
+      </a>
+      <a href="#" class="map-graph-trigger" aria-label="Open city map graph">
+        <rect x="720" y="330" width="260" height="340" rx="16" ry="16"></rect>
+      </a>
+      <a href="cubicle.html" aria-label="Cubicle">
+        <!-- Under the map node area -->
+        <rect x="320" y="440" width="220" height="180" rx="14" ry="14"></rect>
+      </a>
+      <a href="office.html" class="secret-hotspot" aria-label="Secret route to Office">
+        <rect x="480" y="300" width="58" height="88" rx="14" ry="14"></rect>
+      </a>
+    </svg>
+
+    <div class="map-overlay" id="map-overlay" aria-hidden="true">
+      <div class="map-card" role="dialog" aria-modal="true" aria-label="City map">
+        <button type="button" class="map-overlay__close" id="map-overlay-close" aria-label="Close">Close</button>
+        <svg class="city-graph" id="city-graph" viewBox="0 0 960 540" aria-label="City map graph"></svg>
+      </div>
+    </div>
+
+    <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+  </main>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      root.dataset.theme = 'dark';
+
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var raf = 0;
+      var lastX = 0;
+      var lastY = 0;
+      function onPointerMove(e) {
+        if (e.pointerType === 'touch') return;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (raf) return;
+        raf = window.requestAnimationFrame(function () {
+          raf = 0;
+          root.style.setProperty('--spot-x', lastX + 'px');
+          root.style.setProperty('--spot-y', lastY + 'px');
+          root.style.setProperty('--spot-ready', '1');
+        });
+      }
+      if (!reduceMotion) {
+        root.style.setProperty('--spot-ready', '0');
+        window.addEventListener('pointermove', onPointerMove, { passive: true });
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      function setUv(on) {
+        document.body.classList.toggle('uv-on', !!on);
+      }
+
+      function syncFromStorage() {
+        var on = false;
+        try { on = localStorage.getItem('city-flashlight') === 'on'; } catch (_) { on = false; }
+        setUv(on);
+      }
+
+      window.addEventListener('message', function (e) {
+        if (!e || !e.data || e.data.type !== 'city:spot-state') return;
+        setUv(!!e.data.on);
+      });
+
+      syncFromStorage();
+      window.addEventListener('focus', syncFromStorage, { passive: true });
+      document.addEventListener('visibilitychange', syncFromStorage, { passive: true });
+    })();
+  </script>
+  <script>
+    (function () {
+      var overlay = document.getElementById('map-overlay');
+      var closeBtn = document.getElementById('map-overlay-close');
+      var trigger = document.querySelector('a.map-graph-trigger');
+      if (!overlay || !closeBtn || !trigger) return;
+
+      var lastActive = null;
+
+      function openOverlay() {
+        lastActive = document.activeElement;
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        closeBtn.focus();
+      }
+
+      function closeOverlay() {
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        if (lastActive && lastActive.focus) lastActive.focus();
+      }
+
+      trigger.addEventListener('click', function (e) {
+        e.preventDefault();
+        openOverlay();
+      });
+
+      closeBtn.addEventListener('click', closeOverlay);
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeOverlay();
+      });
+
+      window.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeOverlay();
+      });
+    })();
+  </script>
+  <script src="../js/nav-data.js"></script>
+  <script>
+    (function () {
+      var svg = document.getElementById('city-graph');
+      if (!svg) return;
+      var GRAPH = (window.CITY_NAV && window.CITY_NAV.graph) ? window.CITY_NAV.graph : { nodes: [], edges: [] };
+
+      function el(name) {
+        return document.createElementNS('http://www.w3.org/2000/svg', name);
+      }
+
+      function labelFor(file) {
+        var base = file.replace(/\.html$/, '');
+        if (base === 'index') return 'Index';
+        return base.split('-').map(function (p) { return p ? p[0].toUpperCase() + p.slice(1) : p; }).join(' ');
+      }
+
+      function clear(node) {
+        while (node.firstChild) node.removeChild(node.firstChild);
+      }
+
+      function buildAdj(nodes, edges) {
+        var adj = {};
+        for (var i = 0; i < nodes.length; i++) adj[nodes[i]] = [];
+        for (var k = 0; k < edges.length; k++) {
+          var e = edges[k];
+          var a = e[0], b = e[1];
+          if (!adj[a] || !adj[b]) continue;
+          adj[a].push(b);
+          adj[b].push(a);
+        }
+        return adj;
+      }
+
+      function render() {
+        var SERVICE = new Set(['index.html']);
+        var baseNodes = GRAPH.nodes.filter(function (n) { return !SERVICE.has(n); });
+        var baseSet = new Set(baseNodes);
+        var baseEdges = GRAPH.edges.filter(function (e) { return baseSet.has(e[0]) && baseSet.has(e[1]); });
+
+        var adj = buildAdj(baseNodes, baseEdges);
+        var degree = {};
+        baseNodes.forEach(function (n) { degree[n] = (adj[n] || []).length; });
+
+        var current = (location.pathname.split('/').pop() || 'map.html');
+        var root = adj['street.html'] ? 'street.html' : (adj['map.html'] ? 'map.html' : GRAPH.nodes[0]);
+
+        var dist = {};
+        var q = [root];
+        dist[root] = 0;
+        for (var qi = 0; qi < q.length; qi++) {
+          var u = q[qi];
+          var du = dist[u];
+          (adj[u] || []).forEach(function (v) {
+            if (dist[v] !== undefined) return;
+            dist[v] = du + 1;
+            q.push(v);
+          });
+        }
+        GRAPH.nodes.forEach(function (n) { if (dist[n] === undefined) dist[n] = 99; });
+
+        function isCore(n) {
+          if (n === root) return true;
+          if (n === 'map.html' || n === 'square.html' || n === 'hotel.html' || n === 'cafe.html' || n === 'station.html' || n === 'library.html') return true;
+          return degree[n] >= 3;
+        }
+
+        var nodes = baseNodes.slice();
+
+        var set = new Set(nodes);
+        var edges = baseEdges.filter(function (e) { return set.has(e[0]) && set.has(e[1]); });
+
+        // "Rooms": nodes we want to treat as local attachments.
+        var parentOf = {};
+        var roomsByParent = {};
+        var ROOM_PARENT = {
+          "lobby.html": "hotel.html",
+          "daemon.html": "station.html",
+          "game.html": "arcade.html",
+          "book.html": "library.html",
+          "terminal.html": "library.html",
+          "tablet.html": "library.html",
+          "cubicle.html": "map.html"
+        };
+        function isRoom(n) {
+          if (ROOM_PARENT[n] && set.has(ROOM_PARENT[n])) {
+            parentOf[n] = ROOM_PARENT[n];
+            return true;
+          }
+          return false;
+        }
+        nodes.forEach(function (n) {
+          if (!set.has(n)) return;
+          if (!isRoom(n)) return;
+          var p = parentOf[n];
+          roomsByParent[p] = roomsByParent[p] || [];
+          roomsByParent[p].push(n);
+        });
+
+        clear(svg);
+
+        var defs = el('defs');
+        var filter = el('filter');
+        filter.setAttribute('id', 'glow');
+        filter.setAttribute('x', '-30%');
+        filter.setAttribute('y', '-30%');
+        filter.setAttribute('width', '160%');
+        filter.setAttribute('height', '160%');
+        var blur = el('feGaussianBlur');
+        blur.setAttribute('stdDeviation', '4');
+        blur.setAttribute('result', 'blur');
+        var cm = el('feColorMatrix');
+        cm.setAttribute('in', 'blur');
+        cm.setAttribute('type', 'matrix');
+        cm.setAttribute('values', '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.65 0');
+        cm.setAttribute('result', 'glow');
+        var merge = el('feMerge');
+        var mn1 = el('feMergeNode');
+        mn1.setAttribute('in', 'glow');
+        var mn2 = el('feMergeNode');
+        mn2.setAttribute('in', 'SourceGraphic');
+        merge.appendChild(mn1);
+        merge.appendChild(mn2);
+        filter.appendChild(blur);
+        filter.appendChild(cm);
+        filter.appendChild(merge);
+        defs.appendChild(filter);
+        svg.appendChild(defs);
+
+        var gEdges = el('g');
+        var gNodes = el('g');
+        svg.appendChild(gEdges);
+        svg.appendChild(gNodes);
+
+        var W = 960, H = 540;
+        var cx = W * 0.50, cy = H * 0.50;
+
+        function stableKey(s) {
+          var h = 2166136261;
+          for (var i = 0; i < s.length; i++) {
+            h ^= s.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+          }
+          return (h >>> 0);
+        }
+
+        var pos = {};
+
+        // Column layout (left -> right), per your description.
+        // Use evenly spaced 5 columns with safe margins so circles never clip.
+        var marginX = 120;
+        var stepX = (W - marginX * 2) / 4;
+        var X1 = marginX;
+        var X2 = marginX + stepX * 1;
+        var X3 = marginX + stepX * 2;
+        var X4 = marginX + stepX * 3;
+        var X5 = marginX + stepX * 4;
+        var Ymid = 270;
+        function place(n, x, y) { if (set.has(n)) pos[n] = { x: x, y: y }; }
+
+        // Column 1
+        place('entry.html', X1, Ymid);
+
+        // Column 2
+        place('street.html', X2, Ymid);
+        place('arcade.html', X2, 430);
+        place('library.html', X2, 110);
+        place('rooftop.html', X2, 180);
+        place('workshop.html', X2, 350);
+
+        // Column 3
+        place('square.html', X3, Ymid);
+        place('bar.html', X3, 170);
+        place('station.html', X3, 370);
+
+        // Column 4
+        place('hotel.html', X4, Ymid);
+        place('cafe.html', X4, 170);
+        place('lobby.html', X4, 370);
+
+        // Column 5 (to the right of Café)
+        place('map.html', X5, 170);
+        // Cubicle room — under Map
+        place('cubicle.html', X5, 280);
+
+        // Rooms clusters (compact, local, minimally intersecting)
+        // Library rooms — above Library
+        place('book.html', X2 - 70, 55);
+        place('terminal.html', X2 + 5, 45);
+        place('tablet.html', X2 + 80, 65);
+        // Arcade room — above Arcade
+        place('game.html', X2 + 80, 395);
+        // Station room — near Station, slightly to the right
+        place('daemon.html', X3, 450);
+
+        // Fallback for any forgotten nodes (should be rare): stack bottom-left.
+        var spillX = 90, spillY = 500, spillStep = 28, spill = 0;
+        nodes.forEach(function (n) {
+          if (!pos[n]) {
+            pos[n] = { x: spillX, y: spillY - spill * spillStep };
+            spill++;
+          }
+        });
+
+        // Draw edges (undirected unique). Rooms only connect to their parent.
+        var seen = new Set();
+        for (var iE = 0; iE < edges.length; iE++) {
+          var e = edges[iE];
+          var a = e[0], b = e[1];
+          var key = a < b ? a + '|' + b : b + '|' + a;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          if (!pos[a] || !pos[b]) continue;
+
+          // If a node is a "room", only draw its short local connection to its parent.
+          var aRoom = parentOf[a] && set.has(a);
+          var bRoom = parentOf[b] && set.has(b);
+          if (aRoom && parentOf[a] !== b) continue;
+          if (bRoom && parentOf[b] !== a) continue;
+
+          var ln = el('line');
+          ln.setAttribute('class', 'edge' + (isCore(a) && isCore(b) ? ' core' : ' secondary'));
+          ln.setAttribute('x1', pos[a].x.toFixed(2));
+          ln.setAttribute('y1', pos[a].y.toFixed(2));
+          ln.setAttribute('x2', pos[b].x.toFixed(2));
+          ln.setAttribute('y2', pos[b].y.toFixed(2));
+          gEdges.appendChild(ln);
+        }
+
+        // Nodes
+        for (var iN = 0; iN < nodes.length; iN++) {
+          var name = nodes[iN];
+          var p = pos[name];
+          if (!p) continue;
+
+          var aLink = el('a');
+          aLink.setAttribute('href', name);
+          aLink.setAttribute('aria-label', labelFor(name));
+
+          var g = el('g');
+          g.setAttribute('filter', 'url(#glow)');
+
+          var nodeClass = '';
+          if (!isCore(name)) nodeClass += ' node-secondary';
+          if (name === current) nodeClass += ' node-current';
+          if (nodeClass) g.setAttribute('class', nodeClass.trim());
+
+          var baseR = isCore(name) ? 44 : (parentOf[name] ? 26 : 34);
+          var r = baseR + Math.max(0, Math.min(10, degree[name] - 2)) * 0.9;
+          if (name === root) r += 10;
+          if (name === current) r += 4;
+
+          var ring = el('circle');
+          ring.setAttribute('class', 'node-ring');
+          ring.setAttribute('cx', p.x.toFixed(2));
+          ring.setAttribute('cy', p.y.toFixed(2));
+          ring.setAttribute('r', r.toFixed(2));
+          g.appendChild(ring);
+
+          var core = el('circle');
+          core.setAttribute('class', 'node-core');
+          core.setAttribute('cx', p.x.toFixed(2));
+          core.setAttribute('cy', p.y.toFixed(2));
+          core.setAttribute('r', (r * 0.62).toFixed(2));
+          g.appendChild(core);
+
+          var txt = el('text');
+          txt.setAttribute('x', p.x.toFixed(2));
+          txt.setAttribute('y', p.y.toFixed(2));
+          txt.setAttribute('text-anchor', 'middle');
+          txt.setAttribute('dominant-baseline', 'middle');
+          txt.textContent = labelFor(name);
+
+          aLink.appendChild(g);
+          aLink.appendChild(txt);
+          gNodes.appendChild(aLink);
+        }
+      }
+
+      render();
+    })();
+  </script>
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City — System Terminal</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root, [data-theme="dark"] {
+      --bg: #070b10;
+      --text: #e8eef6;
+      --text-muted: rgba(232, 238, 246, 0.66);
+      --border: rgba(232, 238, 246, 0.16);
+      --panel: rgb(9 14 20 / 0.62);
+
+      --accent: #7df0ff;
+      --accent2: #ffc56d;
+      --accent-rgb: 125 240 255;
+      --accent2-rgb: 255 197 109;
+
+      --spot-x: 70%;
+      --spot-y: 10%;
+      --spot-alpha: 0.18;
+      --hot: 0 255 106;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .scene {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+    }
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1100px circle at 50% 45%, transparent 55%, rgb(0 0 0 / 0.58) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.30));
+      pointer-events: none;
+    }
+    .spot {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(700px circle at var(--spot-x) var(--spot-y),
+          rgb(var(--accent-rgb) / var(--spot-alpha)),
+          transparent 60%);
+      mix-blend-mode: screen;
+      opacity: calc(0.95 * var(--spot-ready, 0));
+    }
+    body.in-shell .spot { opacity: 0 !important; }
+
+    .hotspots {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .hotspots a { cursor: pointer; }
+    .hotspots rect {
+      fill: rgb(var(--hot) / 0.02);
+      stroke: transparent;
+      stroke-width: 6px;
+      vector-effect: non-scaling-stroke;
+    }
+    .hotspots a:hover rect {
+      fill: rgb(var(--hot) / 0.07);
+      stroke: transparent;
+    }
+    .hotspots a:focus-visible rect {
+      fill: rgb(var(--hot) / 0.10);
+      stroke: rgb(var(--hot) / 0.90);
+    }
+
+    .standalone-exit {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 2;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-decoration: none;
+      transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    body:not(.in-shell) .standalone-exit {
+      display: inline-block;
+    }
+    .standalone-exit:hover {
+      color: var(--text);
+      border-color: rgb(var(--accent-rgb) / 0.55);
+      box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.10);
+    }
+    .standalone-exit:focus-visible {
+      outline: 2px solid rgb(var(--accent-rgb) / 0.45);
+      outline-offset: 3px;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .overlay foreignObject { pointer-events: all; }
+    .terminal {
+      height: 100%;
+      border-radius: 8px;
+      padding: 0.55rem 0.6rem;
+      overflow: auto;
+      color: rgb(232 238 246 / 0.92);
+      background: rgb(0 0 0 / 0.22);
+      text-shadow: 0 0 12px rgb(125 240 255 / 0.10);
+      border: 1px solid rgb(125 240 255 / 0.18);
+      box-shadow: 0 0 0 2px rgb(0 0 0 / 0.25) inset;
+      pointer-events: auto;
+    }
+    .terminal strong { color: rgb(var(--accent-rgb) / 0.92); }
+    .terminal a { color: rgb(var(--accent-rgb) / 0.92); text-decoration: none; border-bottom: 1px solid transparent; }
+    .terminal a:hover { border-bottom-color: rgb(var(--accent-rgb) / 0.65); }
+    .terminal a:focus-visible { outline: 2px solid rgb(var(--accent-rgb) / 0.45); outline-offset: 3px; border-bottom-color: transparent; }
+
+  </style>
+</head>
+<body>
+  <main class="scene">
+    <img class="bg" src="../pics/daemon-room.jpg" alt="Industrial system terminal with a green CRT display.">
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="spot" aria-hidden="true"></div>
+
+    <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
+
+    <svg class="hotspots" viewBox="0 0 1376 768" preserveAspectRatio="xMidYMid slice" aria-label="Daemon hotspots">
+      <a href="station.html" aria-label="Back to station">
+        <rect x="1000" y="180" width="376" height="588" rx="14" ry="14"></rect>
+      </a>
+    </svg>
+
+    <svg class="overlay" viewBox="0 0 1376 768" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <foreignObject x="365" y="530" width="645" height="115">
+        <section xmlns="http://www.w3.org/1999/xhtml" class="terminal" aria-label="System log">
+          <div><strong>cityd</strong> :: do you remember c-beams glitter in the sky the color of television, tuned to a dead channel?</div>
+          <div><strong>cityd</strong> :: attack ships on fire off the shoulders of giants?</em></div>
+          <div><strong>cityd</strong> :: time to come alive</div>
+        </section>
+      </foreignObject>
+    </svg>
+  </main>
+
+  <script src="../js/scene-common.js"></script>
+  <script src="../js/gesture-bridge.js"></script>
+</body>
+</html>
