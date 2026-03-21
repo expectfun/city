@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>City — Arcade</title>
+  <script>
+    (function () {
+      var u = navigator.userAgent || '';
+      if (/AppleWebKit/i.test(u) && !/(Chrome|Chromium|CriOS|EdgA|Edg\/)/i.test(u)) {
+        document.documentElement.setAttribute('data-arcade-wk', '1');
+      }
+    })();
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     :root, [data-theme="dark"] {
@@ -130,18 +138,13 @@
       pointer-events: auto;
     }
     .screen-frame {
-      width: 200%;
-      height: 200%;
-      transform: scale(0.5);
-      -webkit-transform: scale(0.5);
-      transform-origin: 0 0;
-      -webkit-transform-origin: 0 0;
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
+      width: 100%;
+      height: 100%;
       position: relative;
       z-index: 0;
+      min-height: 0;
     }
-    .screen iframe {
+    .screen-frame iframe {
       width: 100%;
       height: 100%;
       border: 0;
@@ -162,6 +165,21 @@
         radial-gradient(600px circle at 60% 30%, rgb(255 255 255 / 0.06), transparent 60%);
       mix-blend-mode: overlay;
       opacity: 0.85;
+    }
+
+    /* WebKit: overlay blend on top of a live iframe forces full recomposite every frame — use normal blend. */
+    html[data-arcade-wk="1"] .screen {
+      isolation: isolate;
+    }
+    html[data-arcade-wk="1"] .screen::before {
+      mix-blend-mode: normal;
+      opacity: 0.42;
+      background:
+        repeating-linear-gradient(180deg,
+          transparent 0px,
+          transparent 2px,
+          rgb(0 0 0 / 0.22) 3px),
+        radial-gradient(600px circle at 60% 30%, rgb(255 255 255 / 0.06), transparent 60%);
     }
 
     .jump-zone-wrapper {
@@ -225,9 +243,8 @@
         <div class="screen-frame">
           <iframe
             id="arcade-game"
-            src="https://expectfun.github.io/brunogames/brumba.html"
+            src="../tools/brunogames/brumba.html?logicalScale=2"
             title="Brumba"
-            loading="lazy"
             allow="fullscreen"
             allowfullscreen
           ></iframe>
@@ -266,12 +283,15 @@
       var bgImg = document.querySelector('.bg');
       if (bgImg && !bgImg.complete) bgImg.addEventListener('load', layoutArcadeScreen, { once: true });
 
-      if (!gameFrame || !jumpBtn) return;
+      if (!jumpBtn || !gameFrame) return;
 
       function sendSpaceToGame() {
         try {
-          gameFrame.contentWindow.focus();
-          gameFrame.contentWindow.postMessage({ type: 'arcadeJump' }, 'https://expectfun.github.io');
+          var w = gameFrame.contentWindow;
+          if (w) {
+            w.focus();
+            w.postMessage({ type: 'arcadeJump' }, '*');
+          }
         } catch (e) {}
       }
 

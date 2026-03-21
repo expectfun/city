@@ -32,7 +32,7 @@
       'book.html': [{ href: 'library.html', text: 'Back to Library' }],
       'game.html': [
         { href: 'arcade.html', text: 'Back' },
-        { href: 'https://expectfun.github.io/brunogames/brumba.html', text: 'Open full', external: true }
+        { href: '../tools/brunogames/brumba.html', text: 'Open full' }
       ],
       'terminal.html': [
         { href: 'library.html', text: 'Back' },
