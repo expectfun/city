@@ -110,6 +110,16 @@
       height: 100%;
       display: block;
     }
+    .arcade-screen-host {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .arcade-screen-host .screen {
+      position: absolute;
+      pointer-events: auto;
+    }
     .screen {
       width: 100%;
       height: 100%;
@@ -119,23 +129,30 @@
       box-shadow: 0 0 0 2px rgb(0 0 0 / 0.45) inset, 0 18px 55px rgb(0 0 0 / 0.45);
       pointer-events: auto;
     }
-    .screen iframe {
+    .screen-frame {
       width: 200%;
       height: 200%;
-      border: 0;
-      background: #000;
-      display: block;
       transform: scale(0.5);
       -webkit-transform: scale(0.5);
       transform-origin: 0 0;
       -webkit-transform-origin: 0 0;
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
+      position: relative;
+      z-index: 0;
+    }
+    .screen iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #000;
+      display: block;
     }
     .screen::before {
       content: "";
       position: absolute;
       inset: 0;
+      z-index: 1;
       pointer-events: none;
       background:
         repeating-linear-gradient(180deg,
@@ -192,18 +209,7 @@
     <div class="spot" aria-hidden="true"></div>
 
     <svg class="overlay" viewBox="0 0 1376 768" preserveAspectRatio="xMidYMid slice" aria-label="Arcade cabinet overlays">
-      <foreignObject x="565" y="239" width="251" height="293">
-        <div xmlns="http://www.w3.org/1999/xhtml" class="screen" aria-label="Arcade cabinet screen">
-          <iframe
-            id="arcade-game"
-            src="https://expectfun.github.io/brunogames/brumba.html"
-            title="Brumba"
-            loading="lazy"
-            allow="fullscreen"
-            allowfullscreen
-          ></iframe>
-        </div>
-      </foreignObject>
+      <rect id="arcade-screen-bounds" x="565" y="239" width="251" height="293" fill="none" pointer-events="none" aria-hidden="true"/>
       <foreignObject x="618" y="578" width="140" height="58">
         <div xmlns="http://www.w3.org/1999/xhtml" class="jump-zone-wrapper">
           <button type="button" class="jump-zone" id="arcade-jump-btn" aria-label="Jump (arcade button)"></button>
@@ -214,6 +220,21 @@
       </foreignObject>
     </svg>
 
+    <div class="arcade-screen-host">
+      <div class="screen" id="arcade-screen-slot" aria-label="Arcade cabinet screen">
+        <div class="screen-frame">
+          <iframe
+            id="arcade-game"
+            src="https://expectfun.github.io/brunogames/brumba.html"
+            title="Brumba"
+            loading="lazy"
+            allow="fullscreen"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </div>
+    </div>
+
     <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
   </main>
 
@@ -221,6 +242,30 @@
     (function () {
       var gameFrame = document.getElementById('arcade-game');
       var jumpBtn = document.getElementById('arcade-jump-btn');
+      var boundsEl = document.getElementById('arcade-screen-bounds');
+      var slotEl = document.getElementById('arcade-screen-slot');
+      var sceneEl = document.querySelector('.scene');
+
+      function layoutArcadeScreen() {
+        if (!boundsEl || !slotEl || !sceneEl) return;
+        var br = boundsEl.getBoundingClientRect();
+        var sr = sceneEl.getBoundingClientRect();
+        slotEl.style.left = br.left - sr.left + 'px';
+        slotEl.style.top = br.top - sr.top + 'px';
+        slotEl.style.width = br.width + 'px';
+        slotEl.style.height = br.height + 'px';
+      }
+
+      layoutArcadeScreen();
+      requestAnimationFrame(layoutArcadeScreen);
+      window.addEventListener('resize', layoutArcadeScreen);
+      window.addEventListener('orientationchange', layoutArcadeScreen);
+      if (window.ResizeObserver && sceneEl) {
+        new ResizeObserver(layoutArcadeScreen).observe(sceneEl);
+      }
+      var bgImg = document.querySelector('.bg');
+      if (bgImg && !bgImg.complete) bgImg.addEventListener('load', layoutArcadeScreen, { once: true });
+
       if (!gameFrame || !jumpBtn) return;
 
       function sendSpaceToGame() {
