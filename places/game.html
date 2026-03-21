@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>City — Arcade</title>
+  <link rel="stylesheet" href="../tools/brunogames/brumba-game.css">
   <script>
     (function () {
       var u = navigator.userAgent || '';
@@ -144,13 +145,6 @@
       z-index: 0;
       min-height: 0;
     }
-    .screen-frame iframe {
-      width: 100%;
-      height: 100%;
-      border: 0;
-      background: #000;
-      display: block;
-    }
     .screen::before {
       content: "";
       position: absolute;
@@ -167,7 +161,7 @@
       opacity: 0.85;
     }
 
-    /* WebKit: overlay blend on top of a live iframe forces full recomposite every frame — use normal blend. */
+    /* WebKit: overlay blend on top of live canvas/video forces full recomposite every frame — use normal blend. */
     html[data-arcade-wk="1"] .screen {
       isolation: isolate;
     }
@@ -241,13 +235,34 @@
     <div class="arcade-screen-host">
       <div class="screen" id="arcade-screen-slot" aria-label="Arcade cabinet screen">
         <div class="screen-frame">
-          <iframe
-            id="arcade-game"
-            src="../tools/brunogames/brumba.html?logicalScale=2"
-            title="Brumba"
-            allow="fullscreen"
-            allowfullscreen
-          ></iframe>
+          <div
+            id="arcade-brumba-root"
+            class="brumba-root"
+            data-embedded="1"
+            data-logical-scale="2"
+            data-sprite="../tools/brunogames/bruno.png"
+          >
+            <div id="brumba-gameContainer">
+              <canvas id="brumba-gameCanvas"></canvas>
+              <div id="brumba-scoreHUD"></div>
+              <div id="brumba-highScoreHUD"></div>
+              <button type="button" id="brumba-muteButton" aria-label="Toggle sound">🔊</button>
+              <button type="button" id="brumba-pauseButton" aria-label="Pause game">⏸️</button>
+              <div id="brumba-ui">
+                <div class="brumba-overlay" id="brumba-startScreen">
+                  <h1>Bruno's Roomba Ride</h1>
+                  <p class="subtitle">Bruno is cruising on his Roomba!<br>Tap to jump over chairs.<br>Stay low to pass under tables!</p>
+                  <p class="tap-hint">Tap to Start</p>
+                </div>
+                <div class="brumba-overlay" id="brumba-gameOverScreen" style="display: none;">
+                  <h1>Oops!</h1>
+                  <p class="score-display"><span id="brumba-finalScore">0</span></p>
+                  <p class="high-score">Best: <span id="brumba-highScoreDisplay">0</span></p>
+                  <p class="tap-hint">Tap to Retry</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -257,7 +272,6 @@
 
   <script>
     (function () {
-      var gameFrame = document.getElementById('arcade-game');
       var jumpBtn = document.getElementById('arcade-jump-btn');
       var boundsEl = document.getElementById('arcade-screen-bounds');
       var slotEl = document.getElementById('arcade-screen-slot');
@@ -283,23 +297,14 @@
       var bgImg = document.querySelector('.bg');
       if (bgImg && !bgImg.complete) bgImg.addEventListener('load', layoutArcadeScreen, { once: true });
 
-      if (!jumpBtn || !gameFrame) return;
-
-      function sendSpaceToGame() {
-        try {
-          var w = gameFrame.contentWindow;
-          if (w) {
-            w.focus();
-            w.postMessage({ type: 'arcadeJump' }, '*');
-          }
-        } catch (e) {}
-      }
+      if (!jumpBtn) return;
 
       jumpBtn.addEventListener('click', function () {
-        sendSpaceToGame();
+        window.postMessage({ type: 'arcadeJump' }, '*');
       });
     })();
   </script>
+  <script src="../tools/brunogames/brumba-game.js"></script>
   <script src="../js/scene-common.js"></script>
   <script src="../js/gesture-bridge.js"></script>
 </body>

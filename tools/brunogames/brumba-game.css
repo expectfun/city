@@ -1,0 +1,217 @@
+/* Brumba — scoped so it can live inside places/game.html without clashing with .overlay etc. */
+.brumba-root,
+html.brumba-standalone {
+  --city-bg: #070b10;
+  --city-cyan: #7df0ff;
+  --city-cyan-dim: rgba(125, 240, 255, 0.45);
+  --city-gold: #ffc56d;
+  --city-pink: #ff5ac8;
+  --city-text: #e8eef6;
+  --city-panel: rgb(9 14 20 / 0.94);
+}
+
+.brumba-root * {
+  box-sizing: border-box;
+}
+
+html.brumba-standalone,
+html.brumba-standalone body {
+  height: 100%;
+}
+
+body.brumba-standalone {
+  margin: 0;
+  min-height: 100%;
+  overflow: hidden;
+  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--city-bg);
+  color: var(--city-text);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.brumba-standalone > .brumba-root {
+  height: 100%;
+  min-height: 100%;
+}
+
+.brumba-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  color: var(--city-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#brumba-gameContainer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #0a1018;
+}
+
+#brumba-gameCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #0a1018;
+}
+
+#brumba-ui {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  padding: 20px;
+}
+
+#brumba-ui.hidden {
+  display: none;
+}
+
+.brumba-root .brumba-overlay {
+  background: var(--city-panel);
+  border: 1px solid rgba(125, 240, 255, 0.35);
+  border-radius: 16px;
+  padding: 30px 25px;
+  text-align: center;
+  pointer-events: auto;
+  max-width: 300px;
+  width: 100%;
+  color: var(--city-text);
+  box-shadow:
+    0 0 20px rgba(125, 240, 255, 0.12),
+    0 0 48px rgba(255, 90, 200, 0.08);
+}
+
+.brumba-root #brumba-ui h1 {
+  font-size: 22px;
+  margin-bottom: 8px;
+  color: var(--city-cyan);
+  text-shadow: 0 0 14px rgba(125, 240, 255, 0.45);
+}
+
+.brumba-root #brumba-ui .subtitle {
+  font-size: 14px;
+  color: rgba(232, 238, 246, 0.78);
+  margin-bottom: 25px;
+  line-height: 1.4;
+}
+
+.brumba-root #brumba-ui .score-display {
+  font-size: 24px;
+  margin: 15px 0;
+  font-weight: bold;
+  color: var(--city-text);
+}
+
+.brumba-root #brumba-ui .high-score {
+  font-size: 16px;
+  color: var(--city-gold);
+  margin-bottom: 25px;
+}
+
+.brumba-root #brumba-ui .tap-hint {
+  font-size: 18px;
+  color: rgba(125, 240, 255, 0.88);
+  animation: brumba-pulse 1.5s ease-in-out infinite;
+  margin-top: 10px;
+}
+
+@keyframes brumba-pulse {
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.98);
+  }
+}
+
+#brumba-highScoreHUD {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  font-size: 14px;
+  color: var(--city-text);
+  text-shadow:
+    0 0 10px rgba(125, 240, 255, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.9);
+  z-index: 10;
+}
+
+#brumba-scoreHUD {
+  position: absolute;
+  top: 42px;
+  left: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--city-cyan);
+  text-shadow:
+    0 0 12px rgba(125, 240, 255, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.9);
+  z-index: 10;
+}
+
+#brumba-muteButton {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(125, 240, 255, 0.35);
+  border-radius: 50%;
+  background: rgba(9, 14, 20, 0.82);
+  color: var(--city-text);
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  box-shadow: 0 0 12px rgba(125, 240, 255, 0.12);
+}
+
+#brumba-muteButton:active {
+  background: rgba(20, 30, 45, 0.95);
+}
+
+#brumba-pauseButton {
+  position: absolute;
+  top: 70px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 90, 200, 0.35);
+  border-radius: 50%;
+  background: rgba(9, 14, 20, 0.82);
+  color: var(--city-text);
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  box-shadow: 0 0 12px rgba(255, 90, 200, 0.1);
+}
+
+#brumba-pauseButton:active {
+  background: rgba(20, 30, 45, 0.95);
+}
