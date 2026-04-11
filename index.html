@@ -6,6 +6,7 @@
   <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml">
   <link rel="shortcut icon" href="favicon.svg?v=2" type="image/svg+xml">
   <title>City</title>
+  <link rel="preload" as="video" href="pics/entry-transition.mp4" type="video/mp4">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     :root, [data-theme="dark"] {
@@ -375,6 +376,21 @@
       opacity: 1;
       pointer-events: auto;
     }
+    .video-overlay.loading::after {
+      content: "Loading…";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      padding: 0.55rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid rgb(var(--accent-rgb) / 0.28);
+      background: rgb(6 12 18 / 0.55);
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+      box-shadow: 0 0 18px rgb(var(--accent-rgb) / 0.08);
+    }
     .video-overlay video {
       width: 100%;
       height: 100%;
@@ -715,31 +731,121 @@
         ? window.CITY_NAV.videoTransitions
         : Object.create(null);
 
-      function playTransition(target) {
-        if (transitioning) return;
+      function getTransitionEntry(fromScene, toScene) {
+        var entry = VIDEO_TRANSITIONS[fromScene];
+        if (!entry || entry.to !== toScene) return null;
+        return entry;
+      }
+
+      function ensureTransitionVideoSrc(entry) {
+        if (!transVideo || !entry || !entry.src) return;
+        if (transVideo.getAttribute('src') !== entry.src) {
+          transVideo.setAttribute('src', entry.src);
+        }
+        try { transVideo.load(); } catch (e) {}
+      }
+
+      function waitForVideoReady(timeoutMs) {
+        return new Promise(function (resolve) {
+          if (!transVideo) return resolve(false);
+          if (transVideo.readyState >= 3) return resolve(true); // HAVE_FUTURE_DATA
+
+          var done = false;
+          var timer = setTimeout(function () { finish(false); }, timeoutMs);
+
+          function finish(ok) {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            transVideo.removeEventListener('loadeddata', onReady);
+            transVideo.removeEventListener('canplay', onReady);
+            transVideo.removeEventListener('error', onError);
+            resolve(ok);
+          }
+
+          function onReady() { finish(true); }
+          function onError() { finish(false); }
+
+          transVideo.addEventListener('loadeddata', onReady);
+          transVideo.addEventListener('canplay', onReady);
+          transVideo.addEventListener('error', onError);
+          try { transVideo.load(); } catch (e) {}
+        });
+      }
+
+      function primeTransitionVideo() {
         var entry = VIDEO_TRANSITIONS[currentSceneFile];
-        if (!entry || entry.to !== target) { setScene(target); return; }
+        if (!entry || !entry.src) return;
+        ensureTransitionVideoSrc(entry);
+      }
 
-        transitioning = true;
-        videoOverlay.classList.add('active');
-
-        setTimeout(function () {
+      primeTransitionVideo();
+      window.addEventListener('pointerdown', function onFirstPointer() {
+        window.removeEventListener('pointerdown', onFirstPointer);
+        if (!transVideo) return;
+        try {
+          transVideo.muted = true;
+          transVideo.playsInline = true;
           transVideo.currentTime = 0;
           transVideo.play().then(function () {
-            transVideo.addEventListener('ended', function onEnd() {
-              transVideo.removeEventListener('ended', onEnd);
-              setScene(target);
-              setTimeout(function () {
-                videoOverlay.classList.remove('active');
-                transitioning = false;
-              }, 350);
-            });
-          }).catch(function () {
+            transVideo.pause();
+            transVideo.currentTime = 0;
+          }).catch(function () {});
+        } catch (e) {}
+      }, { passive: true });
+
+      function playTransition(target) {
+        if (transitioning) return;
+        var entry = getTransitionEntry(currentSceneFile, target);
+        if (!entry) { setScene(target); return; }
+
+        transitioning = true;
+
+        ensureTransitionVideoSrc(entry);
+        var startedAt = Date.now();
+        var loadingTimer = setTimeout(function () {
+          if (!transitioning) return;
+          // Only show "Loading…" if we're actually waiting on data.
+          if (transVideo && transVideo.readyState >= 3) return;
+          if (!videoOverlay.classList.contains('active')) videoOverlay.classList.add('active');
+          videoOverlay.classList.add('loading');
+        }, 220);
+
+        waitForVideoReady(900).then(function (ready) {
+          clearTimeout(loadingTimer);
+          if (!ready) {
+            // Don’t trap the user behind a black screen because a video decided to buffer.
             setScene(target);
-            videoOverlay.classList.remove('active');
+            if (videoOverlay) {
+              videoOverlay.classList.remove('active');
+              videoOverlay.classList.remove('loading');
+            }
             transitioning = false;
-          });
-        }, 320);
+            return;
+          }
+
+          var delay = Math.max(0, 220 - (Date.now() - startedAt));
+          videoOverlay.classList.add('active');
+          videoOverlay.classList.remove('loading');
+
+          setTimeout(function () {
+            try { transVideo.currentTime = 0; } catch (e) {}
+            transVideo.play().then(function () {
+              transVideo.addEventListener('ended', function onEnd() {
+                transVideo.removeEventListener('ended', onEnd);
+                setScene(target);
+                setTimeout(function () {
+                  videoOverlay.classList.remove('active');
+                  transitioning = false;
+                }, 350);
+              });
+            }).catch(function () {
+              setScene(target);
+              videoOverlay.classList.remove('active');
+              transitioning = false;
+            });
+          }, delay);
+        });
       }
 
       window.addEventListener('message', function (e) {
