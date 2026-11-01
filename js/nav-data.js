@@ -38,7 +38,8 @@
         { href: 'library.html', text: 'Back' },
         { href: 'street.html', text: 'Exit to Street' },
         { href: 'posts/jagged-intelligence.html', text: 'Jagged Intelligence - original' },
-        { href: 'https://addyosmani.com/blog/good-spec/', text: 'Good Spec - original', external: true }
+        { href: 'https://addyosmani.com/blog/good-spec/', text: 'Good Spec - original', external: true },
+        { href: 'https://expectfun.github.io/longplay/cybersound/', text: 'Cybersound - original', external: true }
       ],
       'tablet.html': [
         { href: 'terminal.html', text: 'Back to Terminal' },
