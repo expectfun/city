@@ -36,6 +36,8 @@
       'library.html': { scene: 'library', env: 'indoor' },
       'terminal.html': { scene: 'terminal', env: 'indoor' },
       'tablet.html': { scene: 'tablet', env: 'indoor' },
+      'upstairs.html': { scene: 'upstairs', env: 'indoor' },
+      'booth.html': { scene: 'booth', env: 'indoor' },
       'daemon.html': { scene: 'daemon', env: 'indoor' },
       'rooftop.html': { scene: 'rooftop', env: 'outdoor' },
       'workshop.html': { scene: 'workshop', env: 'indoor' },

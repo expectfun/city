@@ -27,7 +27,16 @@
         { href: 'book.html', text: 'Book' },
         { href: 'terminal.html', text: 'Terminal' },
         { href: 'tablet.html', text: 'Tablet - The Time Machine' },
+        { href: 'upstairs.html', text: 'Stairs - Upper floor' },
         { href: 'street.html', text: 'Back to Street' }
+      ],
+      'upstairs.html': [
+        { href: 'booth.html', text: 'Listening booth' },
+        { href: 'library.html', text: 'Stairs down - Library' }
+      ],
+      'booth.html': [
+        { href: 'upstairs.html', text: 'Leave the booth' },
+        { href: 'https://expectfun.github.io/longplay/cybersound/', text: 'Cybersound - original', external: true }
       ],
       'book.html': [{ href: 'library.html', text: 'Back to Library' }],
       'game.html': [
@@ -86,7 +95,7 @@
         'arcade.html', 'bar.html', 'book.html', 'cafe.html', 'daemon.html', 'entry.html',
         'game.html', 'hotel.html', 'street.html', 'index.html', 'library.html', 'lobby.html',
         'map.html', 'rooftop.html', 'station.html', 'square.html', 'tablet.html', 'terminal.html',
-        'workshop.html', 'cubicle.html'
+        'workshop.html', 'cubicle.html', 'upstairs.html', 'booth.html'
       ],
       edges: [
         ['arcade.html', 'game.html'], ['arcade.html', 'street.html'], ['arcade.html', 'index.html'],
@@ -100,7 +109,9 @@
         ['street.html', 'arcade.html'], ['street.html', 'library.html'], ['street.html', 'rooftop.html'],
         ['street.html', 'square.html'], ['street.html', 'workshop.html'], ['street.html', 'index.html'],
         ['library.html', 'street.html'], ['library.html', 'book.html'], ['library.html', 'terminal.html'],
-        ['library.html', 'tablet.html'], ['library.html', 'index.html'],
+        ['library.html', 'tablet.html'], ['library.html', 'upstairs.html'], ['library.html', 'index.html'],
+        ['upstairs.html', 'library.html'], ['upstairs.html', 'booth.html'], ['upstairs.html', 'index.html'],
+        ['booth.html', 'upstairs.html'], ['booth.html', 'index.html'],
         ['lobby.html', 'hotel.html'], ['lobby.html', 'index.html'],
         ['map.html', 'cafe.html'], ['map.html', 'cubicle.html'],
         ['rooftop.html', 'street.html'], ['rooftop.html', 'index.html'],
