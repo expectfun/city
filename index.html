@@ -69,6 +69,12 @@
       pointer-events: none;
     }
     .chrome > * { pointer-events: auto; }
+    /* A scene can ask for less chrome: no music button (it plays its own sound),
+       or none at all while it shows something full-screen (see city:chrome). */
+    .chrome { transition: opacity 0.25s, visibility 0.25s; }
+    body.chrome-immersive .chrome { opacity: 0; visibility: hidden; }
+    body.chrome-immersive .spot-overlay { display: none; }
+    body.chrome-no-music #music-menu { display: none; }
 
     .chrome .controls {
       display: flex;
@@ -519,6 +525,21 @@
           currentSceneFile = file.split('?')[0].split('/').pop() || file;
           updateDoorsList(currentSceneFile);
         }
+      });
+
+      // Each scene starts with the full chrome; a scene may then trim it with city:chrome.
+      function setChrome(music, immersive) {
+        document.body.classList.toggle('chrome-no-music', !music);
+        document.body.classList.toggle('chrome-immersive', !!immersive);
+        var menu = document.getElementById('music-menu');
+        if (menu && (!music || immersive)) menu.open = false;
+        var links = document.getElementById('shell-links');
+        if (links && immersive) links.open = false;
+      }
+      window.addEventListener('message', function (e) {
+        if (!e || !e.data || e.source !== frame.contentWindow) return;
+        if (e.data.type === 'city:scene') setChrome(true, false);
+        else if (e.data.type === 'city:chrome') setChrome(e.data.music !== false, e.data.immersive);
       });
 
       window.addEventListener('message', function (e) {

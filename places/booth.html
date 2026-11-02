@@ -474,8 +474,6 @@
     }
     .term-status .msg { flex: 1; min-width: 0; }
     /* Clear the shell's corner buttons (flashlight / music / fullscreen). */
-    body.in-shell .term-status { padding-right: 170px; }
-    body.in-shell .term-side { padding-bottom: 0.5rem; }
     .term-status kbd {
       font: inherit;
       padding: 0 0.3rem;
@@ -703,6 +701,8 @@
 
       <rect id="tvBounds" x="631" y="356" width="192" height="147" fill="none" pointer-events="none" aria-hidden="true"/>
       <rect id="termBounds" x="897" y="427" width="124" height="105" fill="none" pointer-events="none" aria-hidden="true"/>
+      <!-- The terminal glass as drawn: turned a little, so its corners don't make a rectangle (TL, TR, BR, BL). -->
+      <polygon id="termQuad" points="894,427 1021,424 1021,534 895,526" fill="none" pointer-events="none" aria-hidden="true"/>
 
       <!-- Record on the platter: flattened by perspective, so draw in a squashed group. -->
       <g transform="translate(630 519) scale(1 0.25)" aria-hidden="true">
@@ -931,6 +931,40 @@
         el.style.width = r.width + 'px';
         el.style.height = r.height + 'px';
       }
+      // Lay a flat element onto a four-corner shape in the picture (perspective included).
+      // The element keeps a plain w x h box; matrix3d maps its corners onto the shape's.
+      function placeOnQuad(el, poly) {
+        var m = poly.ownerSVGElement.getScreenCTM();
+        var scroll = inBooth() && isNarrow();
+        var pts = [];
+        for (var i = 0; i < 4; i++) {
+          var q = poly.points.getItem(i).matrixTransform(m);
+          pts.push([q.x + (scroll ? window.scrollX : 0), q.y + (scroll ? window.scrollY : 0)]);
+        }
+        var dist = function (a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1]); };
+        var w = (dist(pts[0], pts[1]) + dist(pts[3], pts[2])) / 2;
+        var h = (dist(pts[0], pts[3]) + dist(pts[1], pts[2])) / 2;
+        el.style.position = scroll ? 'absolute' : 'fixed';
+        el.style.left = '0px';
+        el.style.top = '0px';
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+        el.style.transformOrigin = '0 0';
+        el.style.transform = quadMatrix(w, h, pts);
+        el.style.fontSize = (h / 8.6).toFixed(2) + 'px';
+      }
+      // Projective map from the w x h box to the quad p = [TL, TR, BR, BL].
+      function quadMatrix(w, h, p) {
+        var x0 = p[0][0], y0 = p[0][1], x1 = p[1][0], y1 = p[1][1];
+        var x2 = p[2][0], y2 = p[2][1], x3 = p[3][0], y3 = p[3][1];
+        var dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+        var dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+        var det = dx1 * dy2 - dx2 * dy1;
+        var g = (dx3 * dy2 - dx2 * dy3) / det, k = (dx1 * dy3 - dx3 * dy1) / det;
+        var a = (x1 - x0 + g * x1) / w, b = (x3 - x0 + k * x3) / h;
+        var d = (y1 - y0 + g * y1) / w, e = (y3 - y0 + k * y3) / h;
+        return 'matrix3d(' + [a, d, 0, g / w, b, e, 0, k / h, 0, 0, 1, 0, x0, y0, 0, 1].join(',') + ')';
+      }
       function layoutHints() {
         var sr = sceneEl.getBoundingClientRect();
         document.querySelectorAll('.hint').forEach(function (h) {
@@ -972,8 +1006,7 @@
         if (sceneEl.classList.contains('zoomed')) return;
         placeOver(crt, termOpen ? $('feedSlot') : theaterOpen ? fitTheater() : $('tvBounds'));
         sizeVideo(inBooth());
-        placeOver(termScreen, $('termBounds'));
-        termScreen.style.fontSize = (parseFloat(termScreen.style.height) / 8.6).toFixed(2) + 'px';
+        placeOnQuad(termScreen, $('termQuad'));
         // When the feed scrolls under the terminal header, clip it instead of drawing over the bar.
         crt.style.clipPath = '';
         if (termOpen) {
@@ -1002,9 +1035,19 @@
       hoverHint(crt, 'hsTv');
       hoverHint(termScreen, 'hsTerm');
 
+      /* ---------- the city's corner buttons ---------- */
+      // The booth plays its own music, so the city's music button goes; full-screen views hide them all.
+      // Other ideas are in docs/city.md ("Listening booth").
+      function syncChrome() {
+        if (window.parent === window) return;
+        window.parent.postMessage({ type: 'city:chrome', music: false, immersive: !inBooth() }, '*');
+      }
+      window.addEventListener('load', syncChrome);
+
       /* ---------- zooming into the TV (theater) or the terminal (reader), and back ---------- */
       function zoomInto(bounds, show) {
         setCrate(false);
+        if (window.parent !== window) window.parent.postMessage({ type: 'city:chrome', music: false, immersive: true }, '*');
         document.querySelectorAll('.hint.show').forEach(function (h) { h.classList.remove('show'); });
         var r = bounds.getBoundingClientRect();
         var sr = sceneEl.getBoundingClientRect();
@@ -1054,6 +1097,7 @@
         if (!theaterOpen) return;
         theaterOpen = false;
         document.body.classList.remove('theater-open');
+        syncChrome();
         if (instant) { theater.classList.remove('on'); theater.hidden = true; layout(); return; }
         fadeOut(theater);
       }
@@ -1074,6 +1118,7 @@
         if (!termOpen) return;
         termOpen = false;
         document.body.classList.remove('term-open');
+        syncChrome();
         fadeOut(term);
       }
 

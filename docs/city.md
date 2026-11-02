@@ -31,6 +31,8 @@ All location pages now live in `city/places/`:
 - `arcade.html`
 - `game.html`
 - `library.html`
+- `upstairs.html` — library upper floor
+- `booth.html` — Cybersound listening booth
 - `terminal.html`
 - `tablet.html`
 - `daemon.html`
@@ -100,6 +102,36 @@ All project JS was consolidated into `city/js/`:
 - Shell route normalization maps bare scene names (`street.html`) to `places/street.html`.
 - `tools/*` and `posts/*` routes are allowed directly.
 - `gesture-bridge.js` remains the event bridge between scene iframe and shell.
+- A scene can trim the shell's corner buttons by posting `{ type: 'city:chrome', music, immersive }`:
+  `music: false` hides the music button, `immersive: true` hides all corner buttons and the flashlight beam.
+  The shell resets both on every `city:scene` message, so other scenes are unaffected.
+
+## Listening booth
+
+`places/booth.html` (library → stairs → `upstairs.html` → booth) plays the records from the
+Cybersound longread (`https://expectfun.github.io/longplay/cybersound/`) and shows the post itself.
+
+- TV: the YouTube video; click to zoom into a full-screen video view.
+- Terminal: live green text; click to open the reader (post text, video in the corner, sides list, cue prompt).
+- Turntable / crates: pick and play records; an empty turntable opens the crates.
+
+### City music vs. booth music (open question)
+
+The booth has its own player, which clashes with the city's music button. A playing record pauses
+the city music and resumes it on leaving.
+
+Current behaviour:
+
+- Booth view: the city's music button is hidden; flashlight and links stay.
+- Reader and full-screen video: all corner buttons are hidden (each view has its own `[ESC] BACK TO BOOTH`).
+
+Other approaches considered, not decided:
+
+- One button for "what's playing here": in the booth the corner music button controls the record
+  instead of the city playlist, so the user sees a single sound system.
+- Show the music button but disabled/dimmed while a record plays ("City music paused — the booth is playing").
+- Hide all corner buttons in the booth view too (rejected for now: the links/map are the city's
+  consistent navigation and a second way out).
 
 ## Known external dependencies (intentional)
 
