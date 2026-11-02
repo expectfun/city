@@ -114,6 +114,8 @@ Cybersound longread (`https://expectfun.github.io/longplay/cybersound/`) and sho
 - TV: the YouTube video; click to zoom into a full-screen video view.
 - Terminal: live green text; click to open the reader (post text, video in the corner, sides list, cue prompt).
 - Turntable / crates: pick and play records; an empty turntable opens the crates.
+- The post is fetched live from longplay. Parts meant for the longplay site only are dropped: anything
+  marked `data-longplay-only`, and the blue/red pills (`.pills`) with the paragraph introducing them.
 
 ### City music vs. booth music (open question)
 
