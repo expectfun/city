@@ -471,6 +471,24 @@ Sure, everyone and their bear is writing about AI now, making you sick of readin
           original: 'https://expectfun.github.io/longplay/cyberpunk2020/',
         },
         {
+          id: 'cybersound',
+          title: 'Как звучит киберпанк? (moved)',
+          kind: 'builtin',
+          tag: 'note',
+          html:
+            '<article>' +
+            '<h1>Как звучит киберпанк?</h1>' +
+            '<p><i>How does cyberpunk sound? — a note from the archive</i></p>' +
+            '<p>Looking for this post? It used to live here, but it is a longread you are meant to <em>listen</em> to: every chapter comes with records to play. ' +
+            'This old terminal has no speakers, so the post has moved to the <strong>listening booth</strong>, where there is a turntable, a TV for the videos and a screen to read on.</p>' +
+            '<p>To find it: step away from the terminal, take the <strong>stairs</strong> in the library up to the upper floor, and look for the booth there.</p>' +
+            '<hr>' +
+            '<p>Ищете этот пост? Раньше он был здесь, но это лонгрид, который нужно <em>слушать</em>: к каждой главе есть пластинки. ' +
+            'У этого старого терминала нет динамиков, поэтому пост переехал в <strong>кабинку для прослушивания</strong> — там есть проигрыватель, телевизор для видео и экран для чтения.</p>' +
+            '<p>Как найти: отойдите от терминала, поднимитесь по <strong>лестнице</strong> в библиотеке на верхний этаж и найдите там кабинку.</p>' +
+            '</article>',
+        },
+        {
           id: 'ai',
           title: 'Neon Memory Dump',
           kind: 'builtin',
@@ -556,7 +574,7 @@ Sure, everyone and their bear is writing about AI now, making you sick of readin
           line('Entries:');
           for (var i = 0; i < POSTS.length; i++) {
             var p = POSTS[i];
-            var tag = p.kind === 'external' ? 'external' : 'builtin';
+            var tag = p.tag || (p.kind === 'external' ? 'external' : 'builtin');
             line('  ' + (i + 1) + ') ' + p.id + '  —  ' + p.title + '  [' + tag + ']');
           }
         }
