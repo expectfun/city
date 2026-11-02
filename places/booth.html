@@ -48,6 +48,13 @@
       transition: transform 0.5s cubic-bezier(.5, 0, .75, .3), filter 0.5s;
     }
     .scene.zoomed { transform: scale(3.2); filter: brightness(1.6) blur(2px); }
+    /* Wide screens: the booth stays zoomed in, dim and soft, as a thin frame around the reader/video.
+       The transform itself is set from JS (centred on the TV or the terminal). */
+    .scene.framed {
+      filter: brightness(0.62) saturate(0.9) blur(1.5px);
+      transition: transform 0.55s cubic-bezier(.4, 0, .2, 1), filter 0.55s;
+    }
+    .scene.unframing { transition: transform 0.5s cubic-bezier(.4, 0, .2, 1), filter 0.5s; }
     .bg {
       position: absolute;
       inset: 0;
@@ -217,6 +224,10 @@
       transition: opacity 0.3s;
     }
     .theater.on { opacity: 1; }
+    body.framed .theater {
+      background: radial-gradient(ellipse at 50% 45%, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.2) 85%);
+      cursor: zoom-out;
+    }
     .theater[hidden] { display: none; }
     .theater-slot { position: absolute; }
     .theater-close {
@@ -431,6 +442,20 @@
     }
     .term[hidden] { display: none; }
     .term.on { opacity: 1; }
+    :root { --frame: clamp(16px, 3.2vmin, 40px); }
+    body.framed .term {
+      inset: var(--frame);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgb(var(--ph-rgb) / 0.20),
+        0 0 40px rgb(var(--ph-rgb) / 0.10),
+        0 20px 80px rgb(0 0 0 / 0.75);
+    }
+    body.framed .term::after { border-radius: inherit; }
+    /* Clicking the frame (the booth around the reader) goes back to the booth. */
+    .frame-catch { position: fixed; inset: 0; z-index: 29; cursor: zoom-out; }
+    .frame-catch[hidden] { display: none; }
     .term::after {
       content: "";
       position: absolute;
@@ -747,6 +772,8 @@
     <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
   </main>
 
+  <div class="frame-catch" id="frameCatch" hidden title="Back to the booth"></div>
+
   <div class="theater" id="theater" hidden>
     <button type="button" class="theater-close" id="theaterClose">[ESC] BACK TO BOOTH</button>
     <div class="theater-slot" id="theaterSlot"></div>
@@ -875,6 +902,7 @@
       var crtVideo = $('crtVideo');
       var termScreen = $('termScreen');
       var theater = $('theater');
+      var frameCatch = $('frameCatch');
       var cratePanel = $('cratePanel');
       var term = $('term');
       var termScroll = $('termScroll');
@@ -1003,7 +1031,8 @@
         crtVideo.style.transform = k > 1 ? 'scale(' + (1 / k) + ')' : '';
       }
       function layout() {
-        if (sceneEl.classList.contains('zoomed')) return;
+        if (sceneMoving || sceneEl.classList.contains('zoomed')) return;
+        if (sceneEl.classList.contains('framed')) applyFrame();
         placeOver(crt, termOpen ? $('feedSlot') : theaterOpen ? fitTheater() : $('tvBounds'));
         sizeVideo(inBooth());
         placeOnQuad(termScreen, $('termQuad'));
@@ -1045,15 +1074,71 @@
       window.addEventListener('load', syncChrome);
 
       /* ---------- zooming into the TV (theater) or the terminal (reader), and back ---------- */
+      // Wide screens keep the booth as a frame around the reader/video; phones use the whole screen.
+      function useFrame() { return !isNarrow(); }
+      var frameAt = null;      // the device's centre, as a fraction of the scene box
+      var sceneMoving = false; // the scene is zooming back out; TV/terminal positions aren't final yet
+      var FRAME_SCALE = 2.4;
+      function applyFrame() {
+        var W = sceneEl.offsetWidth, H = sceneEl.offsetHeight, s = FRAME_SCALE;
+        var vw = window.innerWidth, vh = window.innerHeight;
+        // Centre the device, but never pull the picture's edge into view.
+        var tx = Math.min(0, Math.max(vw - s * W, vw / 2 - s * frameAt[0] * W));
+        var ty = Math.min(0, Math.max(vh - s * H, vh / 2 - s * frameAt[1] * H));
+        sceneEl.style.transformOrigin = '0 0';
+        sceneEl.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + s + ')';
+      }
+      function unframe(done, instant) {
+        document.body.classList.remove('framed');
+        frameCatch.hidden = true;
+        if (!sceneEl.classList.contains('framed')) return done && done();
+        sceneEl.classList.remove('framed');
+        sceneEl.style.transform = '';
+        if (instant || reduceMotion()) {
+          sceneEl.style.transition = 'none';
+          void sceneEl.offsetWidth;
+          sceneEl.style.transition = '';
+          return done && done();
+        }
+        sceneMoving = true;
+        sceneEl.classList.add('unframing');
+        var fin = function () {
+          if (!sceneMoving) return;
+          sceneMoving = false;
+          sceneEl.classList.remove('unframing');
+          if (done) done();
+        };
+        sceneEl.addEventListener('transitionend', function h(e) {
+          if (e.target !== sceneEl || e.propertyName !== 'transform') return;
+          sceneEl.removeEventListener('transitionend', h);
+          fin();
+        });
+        setTimeout(fin, 700);
+      }
+
       function zoomInto(bounds, show) {
         setCrate(false);
         if (window.parent !== window) window.parent.postMessage({ type: 'city:chrome', music: false, immersive: true }, '*');
         document.querySelectorAll('.hint.show').forEach(function (h) { h.classList.remove('show'); });
         var r = bounds.getBoundingClientRect();
         var sr = sceneEl.getBoundingClientRect();
-        sceneEl.style.transformOrigin = (r.left + r.width / 2 - sr.left) + 'px ' + (r.top + r.height / 2 - sr.top) + 'px';
         crt.classList.add('hidden');
         termScreen.classList.add('hidden');
+        var reveal = function () {
+          layout();
+          requestAnimationFrame(layout);
+          crt.classList.remove('hidden');
+          termScreen.classList.remove('hidden');
+        };
+        if (useFrame()) {
+          frameAt = [(r.left + r.width / 2 - sr.left) / sr.width, (r.top + r.height / 2 - sr.top) / sr.height];
+          document.body.classList.add('framed');
+          sceneEl.classList.add('framed');
+          applyFrame();
+          setTimeout(function () { show(); reveal(); }, reduceMotion() ? 0 : 420);
+          return;
+        }
+        sceneEl.style.transformOrigin = (r.left + r.width / 2 - sr.left) + 'px ' + (r.top + r.height / 2 - sr.top) + 'px';
         var done = function () {
           show();
           // Snap back without animating: the overlay covers the scene, and a still-scaled scene
@@ -1062,24 +1147,27 @@
           sceneEl.classList.remove('zoomed');
           void sceneEl.offsetWidth;
           sceneEl.style.transition = '';
-          layout();
-          requestAnimationFrame(layout);
-          crt.classList.remove('hidden');
-          termScreen.classList.remove('hidden');
+          reveal();
         };
         if (reduceMotion()) return done();
         sceneEl.classList.add('zoomed');
         setTimeout(done, 450);
       }
-      function fadeOut(panel, after) {
+      // Fade the reader/video out while the booth zooms back; put the TV and terminal back once both are done.
+      function fadeOut(panel) {
         crt.classList.add('hidden');
+        termScreen.classList.add('hidden');
         panel.classList.remove('on');
-        setTimeout(function () {
+        var pending = 2;
+        var both = function () {
+          if (--pending) return;
           panel.hidden = true;
-          if (after) after();
           layout();
           crt.classList.remove('hidden');
-        }, reduceMotion() ? 0 : 300);
+          termScreen.classList.remove('hidden');
+        };
+        setTimeout(both, reduceMotion() ? 0 : 300);
+        unframe(both);
       }
 
       function openTheater() {
@@ -1098,7 +1186,7 @@
         theaterOpen = false;
         document.body.classList.remove('theater-open');
         syncChrome();
-        if (instant) { theater.classList.remove('on'); theater.hidden = true; layout(); return; }
+        if (instant) { theater.classList.remove('on'); theater.hidden = true; unframe(null, true); layout(); return; }
         fadeOut(theater);
       }
 
@@ -1109,6 +1197,7 @@
           termOpen = true;
           document.body.classList.add('term-open');
           term.hidden = false;
+          frameCatch.hidden = !document.body.classList.contains('framed');
           requestAnimationFrame(function () { term.classList.add('on'); });
           updateReading();
           termScroll.focus({ preventScroll: true });
@@ -1146,7 +1235,13 @@
       crt.addEventListener('click', function () { if (inBooth()) openTheater(); });
       termScreen.addEventListener('click', openTerm);
       $('theaterClose').addEventListener('click', function () { closeTheater(); });
-      theater.addEventListener('click', function (e) { if (e.target === theater && !cratePanel.hidden) setCrate(false); });
+      // Clicking around the video (or the booth frame around the reader) goes back to the booth.
+      theater.addEventListener('click', function (e) {
+        if (e.target !== theater) return;
+        if (!cratePanel.hidden) setCrate(false);
+        else if (document.body.classList.contains('framed')) closeTheater();
+      });
+      frameCatch.addEventListener('click', closeTerm);
       $('btnRecords').addEventListener('click', function () { setCrate(cratePanel.hidden); });
       $('btnRead').addEventListener('click', openTerm);
       $('termClose').addEventListener('click', closeTerm);
