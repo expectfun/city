@@ -106,6 +106,20 @@ All project JS was consolidated into `city/js/`:
   `music: false` hides the music button, `immersive: true` hides all corner buttons and the flashlight beam.
   The shell resets both on every `city:scene` message, so other scenes are unaffected.
 
+## Wayfinding: immersion first
+
+The City should feel like a place you walk through, not a website: no labels floating in the air,
+no "click here". You find your way the way you would in a real city: by signs, doors, light and
+what you recognise from where you've been. When a way isn't obvious, fix the picture first
+(a sign, a lit doorway, a recognisable street end), not the interface.
+
+- Square: the alley back to the street is drawn with the street's own signs (ROOFTOP, WORKSHOP,
+  ARCADE) visible down it; a pink neon sign in the hotel's style points right to the Neo Tokyo Hotel.
+
+Possible later (not now, it works against immersion): hint labels like the booth's, flashing on
+entry and showing on hover ("↩ STREET", "NEO TOKYO HOTEL ▸"). Keep it as a fallback if people
+still get lost after the pictures are clear.
+
 ## Listening booth
 
 `places/booth.html` (library → stairs → `upstairs.html` → booth) plays the records from the
