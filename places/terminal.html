@@ -694,6 +694,7 @@ Sure, everyone and their bear is writing about AI now, making you sick of readin
             if (!article) throw new Error('No <article> found');
 
             var clone = article.cloneNode(true);
+            if (window.dropLongplayOnly) window.dropLongplayOnly(clone);
 
             clone.querySelectorAll('script, style, link[rel="stylesheet"]').forEach(function (n) {
               if (n && n.parentNode) n.parentNode.removeChild(n);
@@ -743,6 +744,7 @@ Sure, everyone and their bear is writing about AI now, making you sick of readin
       mountTerminal();
     })();
   </script>
+  <script src="../js/longplay-only.js"></script>
   <script src="../js/gesture-bridge.js"></script>
 </body>
 </html>

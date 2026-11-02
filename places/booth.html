@@ -841,6 +841,7 @@
   </section>
 
   <script src="../js/scene-common.js"></script>
+  <script src="../js/longplay-only.js"></script>
   <script>
     (function () {
       'use strict';
@@ -1548,18 +1549,6 @@
         }
       }
 
-      // Parts of the post that belong to the longplay site only. Mark anything with data-longplay-only
-      // in the post to keep it out of the booth. The blue/red pills (and the paragraph introducing them,
-      // right before) are dropped even unmarked: the red one leads to the City, and here you're already in it.
-      function dropLongplayOnly(root) {
-        root.querySelectorAll('.pills').forEach(function (pills) {
-          var intro = pills.previousElementSibling;
-          if (intro && intro.tagName === 'P' && /таблет|pill/i.test(intro.textContent)) intro.remove();
-          pills.remove();
-        });
-        root.querySelectorAll('[data-longplay-only]').forEach(function (n) { n.remove(); });
-      }
-
       // The post's click-to-load YouTube boxes become terminal commands that play in the booth.
       function wireVideoCards(root) {
         root.querySelectorAll('.yt[data-id]').forEach(function (box) {
@@ -1616,7 +1605,7 @@
           var frag = document.createElement('article');
           if (hero) frag.appendChild(hero.cloneNode(true));
           Array.prototype.forEach.call(article.childNodes, function (n) { frag.appendChild(n.cloneNode(true)); });
-          dropLongplayOnly(frag);
+          window.dropLongplayOnly(frag);
           stripUnsafe(frag);
           absolutize(frag, POST_URL);
           wireVideoCards(frag);
