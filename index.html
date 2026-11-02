@@ -405,8 +405,63 @@
     }
 
   </style>
+  <script>
+    // Arriving through static: the red pill on a Longplay cyber post (expectfun.github.io/longplay, same
+    // origin) ends on a screen of TV static and leaves 'city-arrive' in sessionStorage; the City picks the
+    // static up from its first frame and lets it clear once the first scene has loaded. ?static shows it on
+    // any visit; STATIC_FOR_ALL would make it every visitor's way in.
+    (function () {
+      var STATIC_FOR_ALL = false;
+      var arrive = false;
+      try { arrive = sessionStorage.getItem('city-arrive') === 'static'; sessionStorage.removeItem('city-arrive'); } catch (_) {}
+      if (/[?&]static(=|&|$)/.test(location.search)) arrive = true;
+      if (STATIC_FOR_ALL) arrive = true;
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) arrive = false;
+      if (arrive) document.documentElement.classList.add('tune-in');
+    })();
+  </script>
+  <style>
+    html.tune-in { background: #7a7a7a; }   /* grey even before the first noise is drawn */
+    .arrive-static { display: none; }
+    html.tune-in .arrive-static {
+      display: block; position: fixed; inset: 0; z-index: 10000; width: 100%; height: 100%;
+      pointer-events: none; image-rendering: pixelated; transition: opacity 2s ease-in;
+    }
+  </style>
 </head>
 <body>
+  <canvas class="arrive-static" id="arrive-static" aria-hidden="true"></canvas>
+  <script>
+    (function () {
+      var canvas = document.getElementById('arrive-static');
+      if (!document.documentElement.classList.contains('tune-in')) { canvas.remove(); return; }
+      var ctx = canvas.getContext('2d');
+      var w = canvas.width = Math.ceil(innerWidth / 3), h = canvas.height = Math.ceil(innerHeight / 3);
+      var img = ctx.createImageData(w, h), px = new Uint32Array(img.data.buffer), done = false;
+      (function draw() {
+        if (done) return;
+        for (var i = 0; i < px.length; i++) { var v = Math.random() * 200 + 30 | 0; px[i] = 0xff000000 | v << 16 | v << 8 | v; }
+        ctx.putImageData(img, 0, 0);
+        requestAnimationFrame(draw);
+      })();
+      // the picture comes through: once the first scene has loaded (or after a while, whatever happens),
+      // the static thins out over two seconds and is gone
+      function clear() {
+        if (canvas.style.opacity) return;
+        canvas.style.opacity = '0';
+        setTimeout(function () { done = true; canvas.remove(); document.documentElement.classList.remove('tune-in'); }, 2100);
+      }
+      window.addEventListener('DOMContentLoaded', function () {
+        var frame = document.getElementById('city-frame');
+        if (!frame) return clear();
+        var loaded = false;
+        try { loaded = frame.contentDocument.readyState === 'complete' && frame.contentDocument.URL !== 'about:blank'; } catch (_) {}
+        if (loaded) setTimeout(clear, 350);
+        else frame.addEventListener('load', function () { setTimeout(clear, 350); }, { once: true });
+      });
+      setTimeout(clear, 6000);
+    })();
+  </script>
   <div class="rotate-overlay" id="rotate-overlay" aria-hidden="true" role="presentation">
     <span class="icon" aria-hidden="true">📱↻</span>
     <p>Rotate your device to landscape for a better view.</p>
