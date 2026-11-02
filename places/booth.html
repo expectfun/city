@@ -927,28 +927,17 @@
       function scroller() { return isNarrow() ? termBody : termScroll; }
       function reduceMotion() { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
 
-      /* ---------- city soundtrack: step aside while the booth plays ---------- */
-      var cityWasPlaying = false;
-      function cityAudio() {
-        try { return window.parent !== window ? window.parent.__CITY_AUDIO_API__ : null; } catch (_) { return null; }
+      /* ---------- city soundtrack: the booth is soundproof ---------- */
+      // Inside, the city music is held silent (and a tab switch won't bring it back); leaving releases it.
+      function holdCity(on) {
+        try {
+          var api = window.parent !== window ? window.parent.__CITY_AUDIO_API__ : null;
+          if (api && api.hold) api.hold(on);
+        } catch (_) {}
       }
-      function hushCity() {
-        var api = cityAudio();
-        if (!api || !api.getEnabled || !api.getEnabled()) return;
-        if (api.isPaused && api.isPaused()) return;
-        cityWasPlaying = true;
-        api.pause();
-      }
-      function restoreCity() {
-        var api = cityAudio();
-        if (cityWasPlaying && api && api.resume) api.resume();
-        cityWasPlaying = false;
-      }
-      window.addEventListener('pagehide', restoreCity);
-      // The city player resumes itself when the tab becomes visible again.
-      document.addEventListener('visibilitychange', function () {
-        if (!document.hidden && playing) setTimeout(hushCity, 60);
-      });
+      holdCity(true);
+      window.addEventListener('pagehide', function () { holdCity(false); });
+      window.addEventListener('pageshow', function (e) { if (e.persisted) holdCity(true); });
 
       /* ---------- placing the TV, the terminal screen and the hint labels over the image ---------- */
       var termOpen = false;
@@ -1464,7 +1453,6 @@
         fallbackFrame.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0&playsinline=1';
         playing = true;
         cueing = false;
-        hushCity();
         render();
       }
 
@@ -1475,8 +1463,7 @@
         if (e.data === S.PLAYING || e.data === S.PAUSED || e.data === S.ENDED) cueing = false;
         if (e.data === S.PLAYING) {
           playing = true;
-          hushCity();
-        } else if (e.data === S.PAUSED || e.data === S.ENDED) {
+          } else if (e.data === S.PAUSED || e.data === S.ENDED) {
           playing = false;
         }
         render();
@@ -1504,8 +1491,6 @@
         current = i;
         cueing = true;
         crtIdle.hidden = true;
-        // Step the city music aside right away, so it doesn't overlap a pre-roll ad.
-        hushCity();
         var id = QUEUE[i].id;
         if (player && player.loadVideoById) player.loadVideoById(id);
         else if (apiState === 'failed') mountFallback(id);

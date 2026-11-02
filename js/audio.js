@@ -29,6 +29,10 @@
   } catch (_) {}
 
   var armed = false;
+  // A scene can hold the soundtrack (the listening booth is soundproof): while held nothing
+  // starts it — not a click, not the tab coming back. Releasing resumes it if it was playing.
+  var held = false;
+  var heldWasPlaying = false;
   var trackIdx = 0;
   var xfading = false;
 
@@ -68,7 +72,7 @@
   function activeEl() { return players[activeSlot]; }
 
   function crossfadeToNext() {
-    if (xfading || !enabled) return;
+    if (xfading || !enabled || held) return;
     xfading = true;
 
     var oldSlot = activeSlot;
@@ -82,6 +86,7 @@
 
     function go() {
       newEl.removeEventListener('canplaythrough', go);
+      if (held) { xfading = false; return; }
       trackIdx = nextTrack;
       activeSlot = newSlot;
       xfading = false;
@@ -125,7 +130,7 @@
   }
 
   function startTrack() {
-    if (!enabled) return;
+    if (!enabled || held) return;
     var el = activeEl();
     if (!el.paused && el.currentSrc && !el.ended) return;
     clearAllFades();
@@ -177,7 +182,7 @@
   }
 
   function resumePlayback() {
-    if (!enabled) return;
+    if (!enabled || held) return;
     var el = activeEl();
     if (!el.paused && el.currentSrc) return;
     clearAllFades();
@@ -208,6 +213,24 @@
     });
   }
 
+  function setHold(on) {
+    on = !!on;
+    if (on === held) return;
+    if (on) {
+      var el = activeEl();
+      heldWasPlaying = enabled && !el.paused && !!el.currentSrc;
+      held = true;
+      if (heldWasPlaying) {
+        clearAllFades();
+        fade(el, el.volume, 0, 400, function () { el.pause(); });
+      }
+    } else {
+      held = false;
+      if (heldWasPlaying) resumePlayback();
+      heldWasPlaying = false;
+    }
+  }
+
   function stopAndMute() {
     setEnabled(false);
   }
@@ -234,7 +257,7 @@
   }
 
   function onVisibility() {
-    if (!enabled) return;
+    if (!enabled || held) return;
     var el = activeEl();
     if (document.hidden) {
       clearAllFades();
@@ -281,7 +304,8 @@
       isPaused: isPaused,
       pause: pausePlayback,
       resume: resumePlayback,
-      playTrack: playTrackAtIndex
+      playTrack: playTrackAtIndex,
+      hold: setHold
     };
   } catch (_) {}
 

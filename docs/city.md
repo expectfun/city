@@ -117,8 +117,9 @@ Cybersound longread (`https://expectfun.github.io/longplay/cybersound/`) and sho
 
 ### City music vs. booth music (open question)
 
-The booth has its own player, which clashes with the city's music button. A playing record pauses
-the city music and resumes it on leaving.
+The booth has its own player, which clashes with the city's music button. The booth is soundproof:
+walking in holds the city music silent (`__CITY_AUDIO_API__.hold(true)`), and nothing restarts it
+while inside, not a click and not the tab becoming visible again. Leaving resumes it if it was playing.
 
 Current behaviour:
 
