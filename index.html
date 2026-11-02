@@ -246,6 +246,14 @@
       color: var(--text-muted);
       transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
     }
+    /* Music started by itself on the first click: the button glows a few times, so people see where it is. */
+    .chrome .controls .music-menu summary.music-hello { animation: music-hello 1.1s ease-in-out 3; }
+    @keyframes music-hello {
+      50% { border-color: rgb(var(--accent-rgb) / 0.9); box-shadow: 0 0 22px rgb(var(--accent-rgb) / 0.55); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .chrome .controls .music-menu summary.music-hello { animation: none; }
+    }
     .chrome .controls .music-menu .music-icon {
       display: inline-block;
       position: relative;
@@ -601,7 +609,7 @@
             <button type="button" id="music-play-pause" aria-label="Play / Pause">▶ Play</button>
             <button type="button" id="music-stop" aria-label="Stop">⏹ Stop</button>
           </div>
-          <p id="music-playlist-desc">Tracks by Moby</p>
+          <p id="music-playlist-desc">Rain Alley is generated live · the rest are by Moby</p>
           <ul id="music-playlist"></ul>
         </div>
       </details>
@@ -621,7 +629,7 @@
   </div>
 
   <script src="js/audio.js"></script>
-  <script src="js/scene-music.js"></script>
+  <script src="js/live-music.js"></script>
   <script src="js/nav-data.js"></script>
   <script>
     (function () {
@@ -718,13 +726,7 @@
       }
       window.addEventListener('message', function (e) {
         if (!e || !e.data || e.source !== frame.contentWindow) return;
-        if (e.data.type === 'city:scene') {
-          setChrome(true, false);
-          // Some scenes have their own generated theme (js/scene-music.js); the rest play the playlist.
-          var audioApi = window.__CITY_AUDIO_API__;
-          var sceneFile = typeof e.data.file === 'string' ? (e.data.file.split('?')[0].split('/').pop() || '') : '';
-          if (audioApi && audioApi.setScene) audioApi.setScene(sceneFile);
-        }
+        if (e.data.type === 'city:scene') setChrome(true, false);
         else if (e.data.type === 'city:chrome') setChrome(e.data.music !== false, e.data.immersive);
       });
 
@@ -831,9 +833,6 @@
           var enabled = api.getEnabled && api.getEnabled();
           var paused = api.isPaused && api.isPaused();
           var idx = api.getTrackIndex ? api.getTrackIndex() : 0;
-          var desc = document.getElementById('music-playlist-desc');
-          var themeName = api.getThemeName ? api.getThemeName() : '';
-          if (desc) desc.textContent = themeName ? 'Here: ' + themeName + ' · or pick a track by Moby' : 'Tracks by Moby';
           if (musicPlayPause) {
             musicPlayPause.textContent = (!enabled || paused) ? '▶ Play' : '⏸ Pause';
             musicPlayPause.setAttribute('aria-label', (!enabled || paused) ? 'Play' : 'Pause');
@@ -904,6 +903,12 @@
           document.addEventListener('DOMContentLoaded', updateMusicSummary, { once: true });
         }
         setInterval(function () { updateMusicSummary(); updateMusicDropdown(); }, 800);
+        window.addEventListener('city-music-start', function (e) {
+          updateMusicSummary();
+          if (!e.detail || !e.detail.auto) return;
+          musicToggle.classList.add('music-hello');
+          setTimeout(function () { musicToggle.classList.remove('music-hello'); }, 3600);
+        });
       }
 
       var fullscreenToggle = document.getElementById('fullscreen-toggle');

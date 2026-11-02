@@ -1,6 +1,11 @@
 /**
- * City soundtrack — 3-track mp3 playlist with crossfade.
- * Two <audio> elements, volume-based crossfade, no Web Audio API.
+ * City soundtrack — a playlist that carries over from scene to scene.
+ * Track 1 is generated live in the browser (js/live-music.js: no audio file, no bandwidth) and is
+ * the default; the Moby mp3s only download when someone picks one. Two <audio> elements crossfade
+ * the mp3s; volume-based, no Web Audio API for them.
+ *
+ * Music is on by default for a new visitor and starts with their first click (browsers allow no
+ * sound before that). Turning it off is remembered, and so is turning it on.
  */
 (function () {
   'use strict';
@@ -14,6 +19,7 @@
   if (isInFrame) return;
 
   var TRACKS = [
+    { live: 'rain-alley', name: 'Rain Alley (live synth)' },
     { src: 'audio/lights.mp3', name: 'Bring the Big Lights' },
     { src: 'audio/aeron.mp3', name: 'Aeron 95' },
     { src: 'audio/discontent.mp3', name: 'Discontent' }
@@ -23,22 +29,33 @@
   var FADE_MS = 1200;
   var XFADE_MS = 2000;
 
-  var enabled = false;
-  try {
-    if (localStorage.getItem('city-music-enabled') === 'on') enabled = true;
-  } catch (_) {}
+  var storedChoice = null;
+  try { storedChoice = localStorage.getItem('city-music-enabled'); } catch (_) {}
+  var enabled = storedChoice !== 'off';
 
   var armed = false;
   // A scene can hold the soundtrack (the listening booth is soundproof): while held nothing
-  // starts it — not a click, not the tab coming back. Releasing resumes it if it was playing.
+  // starts it — not a click, not the tab coming back. Releasing lets it play again.
   var held = false;
-  var heldWasPlaying = false;
+  var userPaused = false;
+  var gestureSeen = false;
+  var announced = false;
   var trackIdx = 0;
   var xfading = false;
 
   var players = [new Audio(), new Audio()];
   var activeSlot = 0;
   var fades = [];
+
+  function live() { return window.__CITY_LIVE_MUSIC__ || null; }
+  function isLive(i) { return !!TRACKS[i].live; }
+  function hasActivation() {
+    try { if (navigator.userActivation) return navigator.userActivation.hasBeenActive; } catch (_) {}
+    return gestureSeen;
+  }
+  function shouldPlay() {
+    return enabled && !held && !userPaused && !document.hidden && hasActivation();
+  }
 
   function clearAllFades() {
     for (var i = 0; i < fades.length; i++) clearInterval(fades[i]);
@@ -71,29 +88,90 @@
 
   function activeEl() { return players[activeSlot]; }
 
+  function mp3Playing() { var el = activeEl(); return !el.paused && !!el.currentSrc; }
+
+  function fadeOutMp3(ms) {
+    var el = activeEl();
+    if (el.paused) return;
+    clearAllFades();
+    fade(el, el.volume, 0, ms, function () { el.pause(); });
+  }
+
+  function startMp3(i) {
+    var el = activeEl();
+    clearAllFades();
+    if (el.dataset.track === String(i) && el.currentSrc) {
+      // Same track, paused: carry on where it was.
+      if (!el.paused) return;
+      el.volume = 0;
+      el.play().catch(function () {});
+      fade(el, 0, VOLUME, FADE_MS);
+      return;
+    }
+    function load() {
+      el.src = TRACKS[i].src;
+      el.dataset.track = String(i);
+      el.load();
+      el.volume = 0;
+      el.play().catch(function () {});
+      fade(el, 0, VOLUME, FADE_MS);
+    }
+    if (!el.paused) fade(el, el.volume, 0, 400, function () { el.pause(); load(); });
+    else load();
+  }
+
+  // Make what's heard match the state: the current track playing, or silence.
+  function apply() {
+    var l = live();
+    if (!shouldPlay()) {
+      if (l) l.stop();
+      fadeOutMp3(400);
+      return;
+    }
+    if (isLive(trackIdx)) {
+      fadeOutMp3(600);
+      if (l) l.play(TRACKS[trackIdx].live, VOLUME);
+    } else {
+      if (l) l.stop();
+      startMp3(trackIdx);
+    }
+    notifyTrack();
+    if (!announced) {
+      announced = true;
+      // First sound of the visit: the shell can point at the music button.
+      try { window.dispatchEvent(new CustomEvent('city-music-start', { detail: { auto: storedChoice === null } })); } catch (_) {}
+    }
+  }
+
   function crossfadeToNext() {
-    if (xfading || !enabled || held) return;
+    if (xfading || !shouldPlay() || isLive(trackIdx)) return;
+    var nextTrack = (trackIdx + 1) % TRACKS.length;
+    if (isLive(nextTrack)) {
+      trackIdx = nextTrack;
+      apply();
+      return;
+    }
     xfading = true;
 
-    var oldSlot = activeSlot;
-    var oldEl = players[oldSlot];
-    var newSlot = (oldSlot + 1) % 2;
+    var oldEl = players[activeSlot];
+    var newSlot = (activeSlot + 1) % 2;
     var newEl = players[newSlot];
-    var nextTrack = (trackIdx + 1) % TRACKS.length;
 
     newEl.src = TRACKS[nextTrack].src;
+    newEl.dataset.track = String(nextTrack);
     newEl.volume = 0;
 
     function go() {
       newEl.removeEventListener('canplaythrough', go);
-      if (held) { xfading = false; return; }
+      xfading = false;
+      if (!shouldPlay()) return;
       trackIdx = nextTrack;
       activeSlot = newSlot;
-      xfading = false;
 
       fade(oldEl, oldEl.volume, 0, XFADE_MS, function () {
         oldEl.pause();
         oldEl.removeAttribute('src');
+        delete oldEl.dataset.track;
         oldEl.load();
       });
       newEl.play().catch(function () {});
@@ -109,17 +187,17 @@
     }
   }
 
-  function onTimeUpdate() {
+  function onTimeUpdate(e) {
     var el = activeEl();
-    if (!el.duration || xfading) return;
+    if (e.target !== el || !el.duration || xfading) return;
     var remaining = el.duration - el.currentTime;
     if (remaining > 0 && remaining <= (XFADE_MS / 1000) + 0.3) {
       crossfadeToNext();
     }
   }
 
-  function onEnded() {
-    if (!xfading && enabled) crossfadeToNext();
+  function onEnded(e) {
+    if (e.target === activeEl() && !xfading && enabled) crossfadeToNext();
   }
 
   function notifyTrack() {
@@ -129,106 +207,68 @@
     } catch (_) {}
   }
 
-  function startTrack() {
-    if (!enabled || held) return;
-    var el = activeEl();
-    if (!el.paused && el.currentSrc && !el.ended) return;
-    clearAllFades();
-    el.src = TRACKS[trackIdx].src;
-    el.load();
-    el.volume = 0;
-    el.play().catch(function () {});
-    fade(el, 0, VOLUME, FADE_MS);
-    notifyTrack();
-  }
-
-  function stopTrack() {
-    clearAllFades();
-    var el = activeEl();
-    fade(el, el.volume, 0, 400, function () {
-      el.pause();
-    });
-  }
-
   function setEnabled(on) {
     enabled = !!on;
+    if (enabled) userPaused = false;
     try {
       localStorage.setItem('city-music-enabled', enabled ? 'on' : 'off');
+      storedChoice = enabled ? 'on' : 'off';
     } catch (_) {}
-    if (enabled) startTrack();
-    else {
-      stopTrack();
+    apply();
+    if (!enabled) {
       setTimeout(function () {
+        if (enabled) return;
         for (var i = 0; i < players.length; i++) {
           players[i].pause();
           players[i].removeAttribute('src');
+          delete players[i].dataset.track;
           players[i].load();
         }
       }, 450);
     }
   }
 
+  // Called on a user gesture (or on load, if the page was already used): sound is allowed now.
+  function kick() {
+    gestureSeen = true;
+    apply();
+  }
+
   function getEnabled() { return enabled; }
   function getTrackName() { return TRACKS[trackIdx].name; }
   function getTracks() { return TRACKS.slice(); }
   function getTrackIndex() { return trackIdx; }
-  function isPaused() { return !enabled || activeEl().paused; }
+  function isPaused() {
+    if (!enabled) return true;
+    if (isLive(trackIdx)) { var l = live(); return !(l && l.isPlaying()); }
+    return !mp3Playing();
+  }
 
   function pausePlayback() {
     if (!enabled) return;
-    var el = activeEl();
-    clearAllFades();
-    fade(el, el.volume, 0, 400, function () { el.pause(); });
+    userPaused = true;
+    apply();
   }
 
   function resumePlayback() {
-    if (!enabled || held) return;
-    var el = activeEl();
-    if (!el.paused && el.currentSrc) return;
-    clearAllFades();
-    el.volume = 0;
-    el.play().catch(function () {});
-    fade(el, 0, VOLUME, FADE_MS);
+    userPaused = false;
+    apply();
   }
 
   function playTrackAtIndex(idx) {
     if (idx < 0 || idx >= TRACKS.length) return;
     trackIdx = idx;
-    if (!enabled) {
-      setEnabled(true);
-      return;
-    }
-    clearAllFades();
-    var el = activeEl();
-    fade(el, el.volume, 0, 400, function () {
-      el.pause();
-      el.removeAttribute('src');
-      el.load();
-      el.src = TRACKS[trackIdx].src;
-      el.load();
-      el.volume = 0;
-      el.play().catch(function () {});
-      fade(el, 0, VOLUME, FADE_MS);
-      notifyTrack();
-    });
+    userPaused = false;
+    gestureSeen = true;
+    if (!enabled) setEnabled(true);
+    else apply();
   }
 
   function setHold(on) {
     on = !!on;
     if (on === held) return;
-    if (on) {
-      var el = activeEl();
-      heldWasPlaying = enabled && !el.paused && !!el.currentSrc;
-      held = true;
-      if (heldWasPlaying) {
-        clearAllFades();
-        fade(el, el.volume, 0, 400, function () { el.pause(); });
-      }
-    } else {
-      held = false;
-      if (heldWasPlaying) resumePlayback();
-      heldWasPlaying = false;
-    }
+    held = on;
+    apply();
   }
 
   function stopAndMute() {
@@ -244,28 +284,16 @@
       window.removeEventListener('keydown', onKey, true);
       armed = false;
     }
-    function onAny() { disarm(); startTrack(); }
+    function onAny() { disarm(); kick(); }
     function onKey(e) {
       if (!e) return;
       var k = e.key;
       if (k === 'Tab' || k === 'Shift' || k === 'Meta' || k === 'Alt' || k === 'Control') return;
       disarm();
-      startTrack();
+      kick();
     }
     window.addEventListener('pointerdown', onAny, true);
     window.addEventListener('keydown', onKey, true);
-  }
-
-  function onVisibility() {
-    if (!enabled || held) return;
-    var el = activeEl();
-    if (document.hidden) {
-      clearAllFades();
-      fade(el, el.volume, 0, 400, function () { el.pause(); });
-    } else {
-      el.play().catch(function () {});
-      fade(el, 0, VOLUME, FADE_MS);
-    }
   }
 
   function init() {
@@ -274,27 +302,23 @@
       players[i].addEventListener('timeupdate', onTimeUpdate, { passive: true });
       players[i].addEventListener('ended', onEnded);
     }
-    document.addEventListener('visibilitychange', onVisibility, { passive: true });
+    document.addEventListener('visibilitychange', apply, { passive: true });
     window.addEventListener('message', function (e) {
       try {
-        if (!e || !e.data) return;
-        if (e.data.type === 'city:gesture') {
-          startTrack();
-          return;
-        }
+        if (e && e.data && e.data.type === 'city:gesture') kick();
       } catch (_) {}
     }, { passive: true });
     armAutostart();
     if (enabled) {
       try {
-        if (navigator.userActivation && navigator.userActivation.hasBeenActive) startTrack();
+        if (navigator.userActivation && navigator.userActivation.hasBeenActive) kick();
       } catch (_) {}
     }
   }
 
   try {
     window.__CITY_AUDIO_API__ = {
-      start: function () { startTrack(); },
+      start: kick,
       stop: stopAndMute,
       setEnabled: setEnabled,
       getEnabled: getEnabled,

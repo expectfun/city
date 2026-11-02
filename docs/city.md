@@ -105,6 +105,16 @@ All project JS was consolidated into `city/js/`:
 - A scene can trim the shell's corner buttons by posting `{ type: 'city:chrome', music, immersive }`:
   `music: false` hides the music button, `immersive: true` hides all corner buttons and the flashlight beam.
   The shell resets both on every `city:scene` message, so other scenes are unaffected.
+- City music (`js/audio.js`): one playlist that carries over from scene to scene, not tied to places.
+  Track 1, "Rain Alley", is generated live in the browser (`js/live-music.js`, Tone.js from cdnjs:
+  original music, no audio file, no GitHub Pages bandwidth); the three Moby mp3s (`audio/`, ~26 MB
+  together) download only when someone picks one in the music menu. After the last Moby track the
+  playlist wraps to Rain Alley.
+- Music is on by default for a new visitor and starts on their first click (usually entry → street);
+  the music button glows a few times then, so it's easy to find. Turning music off (or on) is
+  remembered in `localStorage` (`city-music-enabled`).
+- Idea, not now: per-scene themes that take over on entering a scene. Rejected for now: clicking
+  quickly through scenes would keep switching the music.
 
 ## Wayfinding: immersion first
 
