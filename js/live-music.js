@@ -3,19 +3,38 @@
  * bandwidth, and it's original, so no licence questions). These are tracks in the city playlist
  * (js/audio.js decides when they play: music on, not paused, not held by the booth).
  *
- * Each theme is a function (transport) -> { out, nodes, tick(time, step) }; tick runs every 16th note.
- * It never repeats exactly: arps, drips and melody notes are picked at random from the chord.
+ * Each theme is a function (transport, env) -> { out, nodes, tick(time, step), info }; tick runs every
+ * 16th note. It never repeats exactly: arps, drips and melody notes are picked at random from the chord.
+ * env is a hook for the explainer page (tools/tool-live-music.html): it supplies the dice (rnd), can mute
+ * parts (on, layer) and hears every note (emit). The city playlist uses PLAIN: real dice, nothing muted.
+ * info describes the theme (parts, chords, sections) for that page.
  */
 (function () {
   'use strict';
 
   var TONE_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js';
+  var PLAIN = {
+    rnd: function () { return Math.random(); },
+    used: function () { return false; },
+    on: function () { return true; },
+    layer: function () {},
+    emit: function () {}
+  };
 
   /* ---------- "Rain Alley" — slow synthwave in A minor under the rain (first heard in the street) ---------- */
-  function rainAlley(transport) {
+  function rainAlley(transport, env) {
     var T = window.Tone;
     var nodes = [];
     function keep(n) { nodes.push(n); return n; }
+    env = env || PLAIN;
+    var R = env.rnd;
+    // Every note goes through trig(): it can be muted and is reported (for the explainer page).
+    function trig(id, synth, note, dur, time, vel, chance) {
+      if (!env.on(id)) return;
+      if (note === null) synth.triggerAttackRelease(dur, time, vel);
+      else synth.triggerAttackRelease(note, dur, time, vel);
+      env.emit(id, time, note, chance === undefined ? env.used(id) : chance);
+    }
 
     // Gain brings it level with the playlist mp3s (measured offline, a little softer on purpose).
     var out = keep(new T.Gain(5));
@@ -23,7 +42,9 @@
     var echo = keep(new T.FeedbackDelay({ delayTime: '8n.', feedback: 0.38, wet: 0.32 })).connect(reverb);
 
     // Rain: pink noise, band-limited, slowly breathing; plus single drops ringing in the reverb.
-    var rainGain = keep(new T.Gain(0.11)).connect(out);
+    var rainMute = keep(new T.Gain(1)).connect(out);
+    env.layer('rain', rainMute);
+    var rainGain = keep(new T.Gain(0.11)).connect(rainMute);
     var rainLow = keep(new T.Filter(2600, 'lowpass')).connect(rainGain);
     var rainHigh = keep(new T.Filter(500, 'highpass')).connect(rainLow);
     var rain = keep(new T.Noise('pink')).connect(rainHigh);
@@ -87,13 +108,17 @@
     var BASS_STEPS = [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0];
     var arpDir = 1, arpI = 0, phrase = null;
 
-    function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+    var DRIPS = ['C6', 'E6', 'G6', 'A6', 'B6', 'D7'];
+    var phraseByChance = false;
+
+    function pick(a, tag) { return a[Math.floor(R(tag) * a.length)]; }
     function octaveUp(n) { return n.replace(/\d$/, function (d) { return String(+d + 1); }); }
 
     // Sections, in bars: 0-7 rain and pad; 8-15 + bass and hats; 16-31 + drums, arp, lead;
     // 32-39 breakdown (pad, arp, rain); then back to bar 8.
+    function fold(bar) { return bar < 40 ? bar : 8 + ((bar - 40) % 32); }
     function section(bar) {
-      var b = bar < 40 ? bar : 8 + ((bar - 40) % 32);
+      var b = fold(bar);
       return {
         bass: b >= 8 && b < 32,
         hats: b >= 8 && b < 32,
@@ -108,44 +133,80 @@
       var chord = CHORDS[Math.floor(bar / 2) % CHORDS.length];
       var on = section(bar);
 
-      if (s === 0 && bar % 2 === 0) pad.triggerAttackRelease(chord.pad, '2m', time, 0.6);
-      if (Math.random() < 0.06) drip.triggerAttackRelease(pick(['C6', 'E6', 'G6', 'A6', 'B6', 'D7']), '32n', time, 0.3 + Math.random() * 0.5);
+      if (s === 0 && bar % 2 === 0) trig('pad', pad, chord.pad, '2m', time, 0.6);
+      if (R('drip') < 0.06) trig('drip', drip, pick(DRIPS, 'drip'), '32n', time, 0.3 + R('vel') * 0.5);
 
       if (on.bass && BASS_STEPS[s]) {
-        var n = s === 0 || Math.random() < 0.8 ? chord.root : octaveUp(chord.root);
-        bass.triggerAttackRelease(n, '16n', time, s === 0 ? 0.9 : 0.65);
+        var n = s === 0 || R('bass') < 0.8 ? chord.root : octaveUp(chord.root);
+        trig('bass', bass, n, '16n', time, s === 0 ? 0.9 : 0.65);
       }
-      if (on.hats && s % 2 === 0) hat.triggerAttackRelease('32n', time, s % 4 === 2 ? 0.9 : 0.45);
+      if (on.hats && s % 2 === 0) trig('hat', hat, null, '32n', time, s % 4 === 2 ? 0.9 : 0.45);
       if (on.drums) {
-        if (s === 0 || s === 10) kick.triggerAttackRelease('C1', '8n', time, 0.9);
-        if (s === 4 || s === 12) snare.triggerAttackRelease('16n', time, 0.8);
+        if (s === 0 || s === 10) trig('kick', kick, 'C1', '8n', time, 0.9);
+        if (s === 4 || s === 12) trig('snare', snare, null, '16n', time, 0.8);
       }
-      if (on.arp && s % 2 === 0 && Math.random() < 0.8) {
+      if (on.arp && s % 2 === 0 && R('arp') < 0.8) {
         arpI += arpDir;
         if (arpI >= chord.tones.length - 1 || arpI <= 0) arpDir = -arpDir;
         arpI = Math.max(0, Math.min(chord.tones.length - 1, arpI));
-        arp.triggerAttackRelease(chord.tones[arpI], '16n', time, 0.4 + Math.random() * 0.3);
+        trig('arp', arp, chord.tones[arpI], '16n', time, 0.4 + R('vel') * 0.3);
       }
       if (on.lead) {
         // A new short phrase every other bar: 2-4 notes on random 8ths.
         if (s === 0 && bar % 2 === 0) {
           phrase = {};
-          var count = 2 + Math.floor(Math.random() * 3);
-          for (var i = 0; i < count; i++) phrase[2 * Math.floor(Math.random() * 16)] = pick(PENTA);
+          var count = 2 + Math.floor(R('lead') * 3);
+          for (var i = 0; i < count; i++) phrase[2 * Math.floor(R('lead') * 16)] = pick(PENTA, 'lead');
+          phraseByChance = env.used('lead');
         }
         var at = (bar % 2) * 16 + s;
-        if (phrase && phrase[at]) lead.triggerAttackRelease(phrase[at], '4n', time, 0.6);
+        if (phrase && phrase[at]) trig('lead', lead, phrase[at], '4n', time, 0.6, phraseByChance);
       }
     }
 
-    return { out: out, nodes: nodes, tick: tick };
+    var info = {
+      bpm: 84, key: 'A minor', mood: 'slow, melancholic synthwave under the rain',
+      chords: ['Am9', 'Fmaj7', 'Cadd9', 'Em7'],
+      chordAt: function (bar) { return Math.floor(bar / 2) % 4; },
+      fold: fold,
+      sections: [
+        { name: 'Rain and pad', from: 0, to: 8 },
+        { name: 'Bass and hats come in', from: 8, to: 16 },
+        { name: 'Drums and arpeggio', from: 16, to: 24 },
+        { name: 'A melody now and then', from: 24, to: 32 },
+        { name: 'Break', from: 32, to: 40 }
+      ],
+      loopBack: 8,
+      parts: [
+        { id: 'rain', label: 'Rain', layer: true, what: 'Pink noise (random hiss, softer in the highs) through two filters that keep only its middle, swelling slowly up and down. It never stops.' },
+        { id: 'drip', label: 'Drops', synth: drip, what: 'A pure sine "ping", very short, ringing in a big reverb. Every sixteenth there is a 6% chance of a drop, on a random high note.' },
+        { id: 'pad', label: 'Pad', synth: pad, what: 'The chords: three slightly detuned saw waves per note, a new chord every two bars. A slow filter opens and closes their brightness, and the long attack makes them swell in.' },
+        { id: 'bass', label: 'Bass', synth: bass, what: 'One saw wave with a filter that snaps open and shut on every note: a pluck. The rhythm is fixed; each note has a 20% chance to jump up an octave.' },
+        { id: 'hat', label: 'Hi-hat', synth: hat, what: '35 milliseconds of white noise, high-passed so only the hiss is left.' },
+        { id: 'kick', label: 'Kick', synth: kick, what: 'A sine wave that drops fast in pitch: that is how electronic kick drums are made.' },
+        { id: 'snare', label: 'Snare', synth: snare, what: 'A short burst of white noise through a band-pass filter, into the reverb.' },
+        { id: 'arp', label: 'Arpeggio', synth: arp, what: 'Square-wave blips walking up and down the notes of the chord. Each one has a 20% chance to be skipped, and the echo repeats it a dotted eighth later.' },
+        { id: 'lead', label: 'Melody', synth: lead, what: 'Every two bars, 2 to 4 notes picked from the A minor pentatonic scale, at random places. A soft triangle wave with vibrato.' }
+      ]
+    };
+
+    return { out: out, nodes: nodes, tick: tick, info: info };
   }
 
   /* ---------- "Night Drive" — fast, bright outrun in D minor: four on the floor, pumping bass, a hook ---------- */
-  function nightDrive(transport) {
+  function nightDrive(transport, env) {
     var T = window.Tone;
     var nodes = [];
     function keep(n) { nodes.push(n); return n; }
+    env = env || PLAIN;
+    var R = env.rnd;
+    // Every note goes through trig(): it can be muted and is reported (for the explainer page).
+    function trig(id, synth, note, dur, time, vel, chance) {
+      if (!env.on(id)) return;
+      if (note === null) synth.triggerAttackRelease(dur, time, vel);
+      else synth.triggerAttackRelease(note, dur, time, vel);
+      env.emit(id, time, note, chance === undefined ? env.used(id) : chance);
+    }
 
     var out = keep(new T.Gain(3.3));  // level with the others (measured offline)
     var reverb = keep(new T.Reverb({ decay: 3.2, preDelay: 0.02, wet: 0.28 })).connect(out);
@@ -214,13 +275,16 @@
     ];
     var motif = MOTIFS[0], arpI = 0;
 
-    function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+    var motifByChance = false;
+
+    function pick(a, tag) { return a[Math.floor(R(tag) * a.length)]; }
     function octaveUp(n) { return n.replace(/(\d)$/, function (d) { return String(+d + 1); }); }
 
     // Sections, in bars: 0-3 intro (pad, muffled arp); 4-11 + kick, bass, hats; 12-27 + snare, lead;
     // 28-31 break (pad and arp); then back to bar 4.
+    function fold(bar) { return bar < 32 ? bar : 4 + ((bar - 32) % 28); }
     function section(bar) {
-      var b = bar < 32 ? bar : 4 + ((bar - 32) % 28);
+      var b = fold(bar);
       return { beat: b >= 4 && b < 28, snare: b >= 12 && b < 28, lead: b >= 12 && b < 28, intro: b < 4 };
     }
 
@@ -230,54 +294,90 @@
       var on = section(bar);
 
       if (s === 0) {
-        pad.triggerAttackRelease(chord.pad, '1m', time, 0.55);
+        trig('pad', pad, chord.pad, '1m', time, 0.55);
         arpFilter.frequency.rampTo(on.intro ? 700 + (bar % 32) * 350 : 2400, 0.5, time);
-        if (bar % 4 === 0) motif = pick(MOTIFS);
+        if (bar % 4 === 0) { motif = pick(MOTIFS, 'lead'); motifByChance = env.used('lead'); }
       }
       if (on.beat && s % 4 === 0) {
         padDuck.gain.setValueAtTime(0.35, time);
         padDuck.gain.linearRampToValueAtTime(1, time + 0.28);
-        kick.triggerAttackRelease('C1', '8n', time, 0.95);
+        trig('kick', kick, 'C1', '8n', time, 0.95);
       }
-      if (on.beat && s % 2 === 0) bass.triggerAttackRelease(chord.bass[(s / 2) % 2], '16n', time, s % 4 === 0 ? 0.9 : 0.7);
-      if (on.beat && s % 4 === 2) hat.triggerAttackRelease('16n', time, 0.7);
-      if (on.snare && (s === 4 || s === 12)) snare.triggerAttackRelease('8n', time, 0.85);
-      if (Math.random() < 0.9) {
+      if (on.beat && s % 2 === 0) trig('bass', bass, chord.bass[(s / 2) % 2], '16n', time, s % 4 === 0 ? 0.9 : 0.7);
+      if (on.beat && s % 4 === 2) trig('hat', hat, null, '16n', time, 0.7);
+      if (on.snare && (s === 4 || s === 12)) trig('snare', snare, null, '8n', time, 0.85);
+      if (R('arp') < 0.9) {
         arpI = (arpI + 1) % chord.tones.length;
-        arp.triggerAttackRelease(chord.tones[arpI], '32n', time, 0.35 + Math.random() * 0.25);
+        trig('arp', arp, chord.tones[arpI], '32n', time, 0.35 + R('vel') * 0.25);
       }
       if (on.lead && s % 2 === 0) {
         var i = motif[s / 2];
         if (i >= 0) {
           var n = chord.tones[i];
           if (bar % 8 >= 4) n = octaveUp(n);
-          lead.triggerAttackRelease(n, '8n', time, 0.7);
+          trig('lead', lead, n, '8n', time, 0.7, motifByChance);
         }
       }
     }
 
-    return { out: out, nodes: nodes, tick: tick };
+    var info = {
+      bpm: 106, key: 'D minor', mood: 'fast, bright outrun: four on the floor, pumping bass, a hook',
+      chords: ['Dm7', 'Bbmaj7', 'F', 'Cadd9'],
+      chordAt: function (bar) { return bar % 4; },
+      fold: fold,
+      sections: [
+        { name: 'Intro: pad, muffled arpeggio', from: 0, to: 4 },
+        { name: 'Beat and bass come in', from: 4, to: 12 },
+        { name: 'Snare and the hook', from: 12, to: 28 },
+        { name: 'Break', from: 28, to: 32 }
+      ],
+      loopBack: 4,
+      parts: [
+        { id: 'pad', label: 'Pad', synth: pad, what: 'The chords, one per bar: three detuned saw waves per note. On every beat its volume dips and swells back, as if pushed aside by the kick: the "pumping" sound of synthwave.' },
+        { id: 'bass', label: 'Bass', synth: bass, what: 'Eighth notes jumping between the root and its octave: a saw wave with a snappy filter. Completely fixed: no dice here.' },
+        { id: 'arp', label: 'Arpeggio', synth: arp, what: 'Fast square-wave notes running through the chord, every sixteenth; 10% are skipped. In the intro a filter keeps it muffled and opens bar by bar.' },
+        { id: 'lead', label: 'Hook', synth: lead, what: 'The tune: one of four short shapes, picked at random every four bars and fitted to the current chord, jumping up an octave in the second half of each eight bars. Two detuned saws gliding between notes.' },
+        { id: 'kick', label: 'Kick', synth: kick, what: 'On every beat ("four on the floor"): a sine wave dropping fast in pitch.' },
+        { id: 'snare', label: 'Snare', synth: snare, what: 'White noise through a band-pass into a short, bright room: the big 80s snare.' },
+        { id: 'hat', label: 'Hi-hat', synth: hat, what: 'Noise on the off-beats, between the kicks.' }
+      ]
+    };
+
+    return { out: out, nodes: nodes, tick: tick, info: info };
   }
 
   /* ---------- "Ghost Signal" — dark, slow, film-score ambience in C minor: drone, brass swells, bells ---------- */
-  function ghostSignal(transport) {
+  function ghostSignal(transport, env) {
     var T = window.Tone;
     var nodes = [];
     function keep(n) { nodes.push(n); return n; }
+    env = env || PLAIN;
+    var R = env.rnd;
+    // Every note goes through trig(): it can be muted and is reported (for the explainer page).
+    function trig(id, synth, note, dur, time, vel, chance) {
+      if (!env.on(id)) return;
+      if (note === null) synth.triggerAttackRelease(dur, time, vel);
+      else synth.triggerAttackRelease(note, dur, time, vel);
+      env.emit(id, time, note, chance === undefined ? env.used(id) : chance);
+    }
 
     var out = keep(new T.Gain(3.6));  // a little softer than the others: it is ambience
     var hall = keep(new T.Reverb({ decay: 11, preDelay: 0.06, wet: 0.5 })).connect(out);
-    var echo = keep(new T.FeedbackDelay({ delayTime: '4n.', feedback: 0.45, wet: 0.35 })).connect(hall);
+    var echo = keep(new T.FeedbackDelay({ delayTime: '4n.', maxDelay: 2, feedback: 0.45, wet: 0.35 })).connect(hall);  // 1.4 s at 64 BPM
 
     // Drone: two wide saws under a dark low-pass, gliding to each new root.
-    var droneFilter = keep(new T.Filter({ frequency: 320, type: 'lowpass', Q: 1.2 })).connect(hall);
+    var droneMute = keep(new T.Gain(1)).connect(hall);
+    env.layer('drone', droneMute);
+    var droneFilter = keep(new T.Filter({ frequency: 320, type: 'lowpass', Q: 1.2 })).connect(droneMute);
     var droneSweep = keep(new T.LFO(0.025, 220, 520)).connect(droneFilter.frequency);
     var droneGain = keep(new T.Gain(0.09)).connect(droneFilter);
     var droneA = keep(new T.FatOscillator('C2', 'sawtooth', 18)).connect(droneGain);
     var droneB = keep(new T.FatOscillator('G2', 'sawtooth', 24)).connect(droneGain);
 
     // Wind: brown noise through a wandering band-pass.
-    var windGain = keep(new T.Gain(0.05)).connect(out);
+    var windMute = keep(new T.Gain(1)).connect(out);
+    env.layer('wind', windMute);
+    var windGain = keep(new T.Gain(0.05)).connect(windMute);
     var windFilter = keep(new T.Filter({ frequency: 500, type: 'bandpass', Q: 1.5 })).connect(windGain);
     var windSweep = keep(new T.LFO(0.04, 250, 1100)).connect(windFilter.frequency);
     var wind = keep(new T.Noise('brown')).connect(windFilter);
@@ -322,12 +422,13 @@
     var BELLS = ['C5', 'Eb5', 'F5', 'G5', 'Bb5', 'D6'];
     var code = null;
 
-    function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+    function pick(a, tag) { return a[Math.floor(R(tag) * a.length)]; }
 
     // Sections, in bars (a bar is ~3.75 s): 0-3 drone and wind; 4+ brass; 6+ bells;
     // 12-23 + heartbeat and the signal; 24-31 brass, bells, drone; then back to bar 4.
+    function fold(bar) { return bar < 32 ? bar : 4 + ((bar - 32) % 28); }
     function section(bar) {
-      var b = bar < 32 ? bar : 4 + ((bar - 32) % 28);
+      var b = fold(bar);
       return { brass: b >= 4, bells: b >= 6, pulse: b >= 12 && b < 24 };
     }
 
@@ -339,26 +440,49 @@
       if (s === 0 && bar % 4 === 0) {
         droneA.frequency.rampTo(chord.drone[0], 6, time);
         droneB.frequency.rampTo(chord.drone[1], 6, time);
-        if (on.brass) brass.triggerAttackRelease(chord.brass, '3m', time, 0.5);
+        if (on.brass) trig('brass', brass, chord.brass, '3m', time, 0.5);
       }
-      if (on.bells && s % 2 === 0 && Math.random() < 0.06) bell.triggerAttackRelease(pick(BELLS), '8n', time, 0.3 + Math.random() * 0.4);
-      if (on.pulse && (s === 0 || s === 3)) beat.triggerAttackRelease('A0', '8n', time, s === 0 ? 0.8 : 0.5);
+      if (on.bells && s % 2 === 0 && R('bell') < 0.06) trig('bell', bell, pick(BELLS, 'bell'), '8n', time, 0.3 + R('vel') * 0.4);
+      if (on.pulse && (s === 0 || s === 3)) trig('beat', beat, 'A0', '8n', time, s === 0 ? 0.8 : 0.5);
       if (on.pulse) {
-        if (s === 0 && !code && Math.random() < 0.25) {
+        if (s === 0 && !code && R('signal') < 0.25) {
           // A short burst of dots and dashes on 32nds-ish steps.
           code = { at: 0, taps: [] };
-          var len = 3 + Math.floor(Math.random() * 5);
-          for (var i = 0; i < len; i++) code.taps.push(Math.random() < 0.6 ? '32n' : '16n');
+          var len = 3 + Math.floor(R('signal') * 5);
+          for (var i = 0; i < len; i++) code.taps.push(R('signal') < 0.6 ? '32n' : '16n');
+          code.byChance = env.used('signal');
         }
         if (code && s % 2 === 0) {
           var d = code.taps[code.at++];
-          if (d) signal.triggerAttackRelease('A5', d, time, 0.6);
+          if (d) trig('signal', signal, 'A5', d, time, 0.6, code.byChance);
           if (code.at >= code.taps.length) code = null;
         }
       }
     }
 
-    return { out: out, nodes: nodes, tick: tick };
+    var info = {
+      bpm: 64, key: 'C minor', mood: 'dark, slow film-score ambience',
+      chords: ['Cm9', 'Abmaj7', 'Fm9', 'Dbmaj7'],
+      chordAt: function (bar) { return Math.floor(bar / 4) % 4; },
+      fold: fold,
+      sections: [
+        { name: 'Drone and wind', from: 0, to: 4 },
+        { name: 'Brass swells, then bells', from: 4, to: 12 },
+        { name: 'Heartbeat and the signal', from: 12, to: 24 },
+        { name: 'Brass and bells', from: 24, to: 32 }
+      ],
+      loopBack: 4,
+      parts: [
+        { id: 'drone', label: 'Drone', layer: true, what: 'Two wide saw waves held low under a dark filter that slowly breathes. When the chord changes they glide to the new root over six seconds instead of jumping.' },
+        { id: 'wind', label: 'Wind', layer: true, what: 'Brown noise (even darker than pink) through a narrow filter that wanders up and down: it sounds like wind.' },
+        { id: 'brass', label: 'Brass', synth: brass, what: 'The chords, every four bars: saw waves with a three-second attack and a filter that opens as they swell, the classic film-synth brass. The step from Cm9 down to Dbmaj7 is what gives the dread.' },
+        { id: 'bell', label: 'Bells', synth: bell, what: 'FM synthesis: one wave bends the pitch of another very fast, which makes metallic, bell-like overtones. Each eighth there is a 6% chance of a bell.' },
+        { id: 'beat', label: 'Heartbeat', synth: beat, what: 'A low, muffled "lub-dub" on every bar, only in the middle of the track.' },
+        { id: 'signal', label: 'Signal', synth: signal, what: 'Now and then a far-off radio tapping short and long blips, made up on the spot: a square wave through a narrow filter and a long echo.' }
+      ]
+    };
+
+    return { out: out, nodes: nodes, tick: tick, info: info };
   }
 
   var THEMES = {
@@ -418,7 +542,7 @@
       }).then(function () {
         if (my !== token) return;
         var master = new T.Gain(0).toDestination();
-        var theme = THEMES[key].build(T.Transport);
+        var theme = THEMES[key].build(T.Transport, PLAIN);
         theme.out.connect(master);
         var step = 0;
         var repeatId = T.Transport.scheduleRepeat(function (time) { theme.tick(time, step++); }, '16n');

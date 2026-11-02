@@ -289,13 +289,13 @@
       line-height: 1.4;
     }
     .viz-chooser__grid {
-      width: min(760px, 100%);
+      width: min(980px, 100%);
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 0.75rem;
       margin-top: 0.6rem;
     }
-    @media (max-width: 720px) {
+    @media (max-width: 860px) {
       .viz-chooser__grid { grid-template-columns: 1fr; }
     }
     .viz-card {
@@ -316,6 +316,10 @@
       background: linear-gradient(180deg, rgba(255, 93, 93, 0.08), rgba(255, 255, 255, 0.02));
       border-color: rgba(255, 93, 93, 0.18);
     }
+    .viz-card[data-viz="music"] {
+      background: linear-gradient(180deg, rgba(192, 132, 255, 0.08), rgba(255, 255, 255, 0.02));
+      border-color: rgba(192, 132, 255, 0.2);
+    }
     .viz-card:hover {
       transform: translateY(-1px);
       border-color: rgb(var(--accent-rgb) / 0.45);
@@ -331,6 +335,11 @@
       border-color: rgba(255, 93, 93, 0.45);
       background: linear-gradient(180deg, rgba(255, 93, 93, 0.12), rgba(255, 255, 255, 0.03));
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 0 0 3px rgba(255, 93, 93, 0.08);
+    }
+    .viz-card[data-viz="music"]:hover {
+      border-color: rgba(192, 132, 255, 0.5);
+      background: linear-gradient(180deg, rgba(192, 132, 255, 0.12), rgba(255, 255, 255, 0.03));
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 0 0 3px rgba(192, 132, 255, 0.08);
     }
     .viz-card__kicker {
       font-size: 0.72rem;
@@ -376,6 +385,12 @@
     .viz-overlay[data-view="bubble"] .viz-bubble { display: block; }
     .viz-overlay[data-view="bubble"] .viz-chooser { display: none; }
     .viz-overlay[data-view="bubble"] .viz-amm { display: none; }
+
+    /* The music lab is its own page (tools/tool-live-music.html), loaded into a frame when opened. */
+    .viz-music { display: none; min-height: 0; height: 100%; background: rgba(6, 14, 20, 0.55); }
+    .viz-music iframe { display: block; width: 100%; height: 100%; border: 0; }
+    .viz-overlay[data-view="music"] .viz-music { display: block; }
+    .viz-overlay[data-view="music"] .viz-chooser { display: none; }
 
     .viz-overlay[data-view="amm"] .viz-amm { display: block; }
     .viz-overlay[data-view="amm"] .viz-chooser { display: none; }
@@ -855,7 +870,7 @@
         <div class="viz-overlay__body">
           <div class="viz-chooser" id="viz-chooser">
             <h2>Choose a visualization</h2>
-            <p>"You pick the blue one... you learn sorting algorithms like a normal person. You pick the red... and eventually lose all your money on crypto."</p>
+            <p>Three machines on the roof, each one opened up so you can watch how it works inside.</p>
             <div class="viz-chooser__grid">
               <button type="button" class="viz-card" data-viz="bubble">
                 <div class="viz-card__kicker">Algorithms</div>
@@ -867,7 +882,15 @@
                 <div class="viz-card__title">AMM Price Impact</div>
                 <p class="viz-card__desc">Constant product curve + swap price impact demo.</p>
               </button>
+              <button type="button" class="viz-card" data-viz="music">
+                <div class="viz-card__kicker">Sound</div>
+                <div class="viz-card__title">How the City composes</div>
+                <p class="viz-card__desc">The City's music, made live: rules, dice and synths, one sixteenth at a time.</p>
+              </button>
             </div>
+          </div>
+          <div class="viz-music" id="viz-music" aria-label="Live music visualization">
+            <iframe id="viz-music-frame" title="How the City composes"></iframe>
           </div>
           <div class="viz-amm" id="viz-amm" aria-label="AMM visualization">
             <div class="amm-intro">
@@ -1045,10 +1068,20 @@
 
       var VIZ = {
         defi: { label: 'AMM Price Impact', kind: 'amm' },
-        bubble: { label: 'Bubble Sort', kind: 'bubble' }
+        bubble: { label: 'Bubble Sort', kind: 'bubble' },
+        music: { label: 'How the City composes', kind: 'music' }
       };
+      var musicFrame = document.getElementById('viz-music-frame');
+      // Leaving the music view unloads the page: its sound stops and the city music comes back.
+      var musicLoaded = false;
+      function unloadMusic() {
+        if (!musicFrame || !musicLoaded) return;
+        musicLoaded = false;
+        musicFrame.setAttribute('src', 'about:blank');
+      }
 
       function showChooser() {
+        unloadMusic();
         overlay.dataset.view = 'choose';
         title.textContent = 'Choose a visualization';
         backBtn.hidden = true;
@@ -1067,6 +1100,9 @@
             ammInited = true;
           }
           if (ammUpdate) requestAnimationFrame(ammUpdate);
+        } else if (entry.kind === 'music') {
+          overlay.dataset.view = 'music';
+          if (musicFrame && !musicLoaded) { musicLoaded = true; musicFrame.setAttribute('src', '../tools/tool-live-music.html?embed=1'); }
         } else if (entry.kind === 'bubble') {
           overlay.dataset.view = 'bubble';
           if (!bubbleInited) {
@@ -1088,6 +1124,7 @@
         overlay.classList.remove('is-open');
         overlay.setAttribute('aria-hidden', 'true');
         overlay.dataset.view = 'choose';
+        unloadMusic();
         if (bubbleApi && bubbleApi.stop) bubbleApi.stop();
       }
 

@@ -114,6 +114,13 @@ All project JS was consolidated into `city/js/`:
   A live track never ends, so after ~4.5 minutes the playlist moves on to the next live one, and never
   by itself to an mp3: the three Moby mp3s (`audio/`, ~26 MB together) download only when someone picks
   one in the music menu. After the last Moby track the playlist wraps back to the live tracks.
+- `tools/tool-live-music.html` ("How the City composes"): an explainer that plays the live tracks with the
+  same code and shows how they're made: a 16-step grid per instrument (rules vs. dice), chords and sections
+  (click to jump), a Chance dial (0% = the same every time, like a recording), the live wave and spectrum,
+  each instrument's recipe and envelope, mute/solo. It holds the city music while open, like the booth.
+  It's the third of the rooftop's visualisations (`rooftop.html?viz=music`), loaded with `?embed=1` into the
+  overlay and unloaded when you leave it, and it is styled like the other two. Still open: a way in from the
+  library booth too, close to the Cybersound post.
 - Music is on by default for a new visitor and starts on their first click (usually entry → street);
   the music button glows a few times then, so it's easy to find. Turning music off (or on) is
   remembered in `localStorage` (`city-music-enabled`).
