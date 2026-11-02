@@ -409,17 +409,17 @@
     // Arriving from Longplay's red pill (expectfun.github.io/longplay, same origin): the post ends on a screen of
     // TV static and leaves 'city-arrive' in sessionStorage, and the City picks the static up from its first frame
     // and lets it clear once the first scene has loaded. ?static shows it on any visit; STATIC_FOR_ALL would make
-    // it every visitor's way in. The post also leaves 'city-hint', in its own language: a few seconds after the
-    // static has cleared it's typed over the screen, like the messages on Neo's monitor, and stays until the
-    // reader leaves the first scene.
+    // it every visitor's way in. The post also leaves a message in its own language: 'city-hint', its lines
+    // separated by |, and 'city-hint-head', the header. A few seconds after the static has cleared it comes in
+    // on the City's HUD, typed like the messages on Neo's monitor, and stays until the reader leaves the first scene.
     (function () {
       var STATIC_FOR_ALL = false;
-      var arrive = { static: false, hint: '' };
+      var arrive = { static: false, hint: '', head: '' };
       try {
         arrive.static = sessionStorage.getItem('city-arrive') === 'static';
         arrive.hint = sessionStorage.getItem('city-hint') || '';
-        sessionStorage.removeItem('city-arrive');
-        sessionStorage.removeItem('city-hint');
+        arrive.head = sessionStorage.getItem('city-hint-head') || '';
+        ['city-arrive', 'city-hint', 'city-hint-head'].forEach(function (k) { sessionStorage.removeItem(k); });
       } catch (_) {}
       if (/[?&]static(=|&|$)/.test(location.search)) arrive.static = true;
       if (STATIC_FOR_ALL) arrive.static = true;
@@ -436,22 +436,44 @@
       display: block; position: fixed; inset: 0; z-index: 10000; width: 100%; height: 100%;
       pointer-events: none; image-rendering: pixelated; transition: opacity 2s ease-in;
     }
-    /* in the upper middle, over the dead-channel sky and clear of the gateway; as wide as the longest message
-       from the start (set by the script), so the typing grows to the right without the box shifting */
+    /* the message: a panel of the City's HUD, the same glass as the controls below, top left over the sky and
+       clear of the gateway. The frame is the City's own; the green text inside is someone else's signal. As wide
+       as the longest line from the start (set by the script), so the typing never reflows the panel. */
     .arrive-hint {
-      position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 9999; box-sizing: content-box;
-      max-width: calc(100vw - 60px); margin: 0; padding: 14px 20px; border-radius: 5px; background: rgb(0 0 0 / 0.66);
-      pointer-events: none; font: clamp(20px, 2.6vw, 32px)/1.45 "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
-      color: #4dff88; text-shadow: 0 0 10px rgb(77 255 136 / 0.6); white-space: pre-wrap; transition: opacity .6s ease;
+      position: fixed; top: 10vh; left: 6vw; z-index: 9999; box-sizing: content-box; max-width: calc(88vw - 40px);
+      margin: 0; padding: 12px 20px 16px; pointer-events: none;
+      border: 1px solid rgb(var(--accent-rgb) / 0.28); border-radius: 12px; background: rgb(6 12 18 / 0.55);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 0 24px rgb(var(--accent-rgb) / 0.08), inset 0 1px 0 rgb(255 255 255 / 0.04);
+      transition: opacity .6s ease;
+      animation: hint-online .5s steps(1) both;   /* a HUD element coming online */
+    }
+    @keyframes hint-online { 0% { opacity: 0; } 15% { opacity: .7; } 30% { opacity: .1; } 50% { opacity: 1; } 65% { opacity: .45; } 80%, 100% { opacity: 1; } }
+    .arrive-hint .head {
+      display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
+      font: 600 11px/1.4 "SF Pro Text", -apple-system, system-ui, sans-serif; letter-spacing: .16em; text-transform: uppercase;
+      color: rgb(var(--accent-rgb) / 0.72);
+    }
+    .arrive-hint .dot { width: 7px; height: 7px; border-radius: 50%; background: #4dff88; box-shadow: 0 0 8px #4dff88;
+      animation: hint-pulse 1.6s ease-in-out infinite; }
+    @keyframes hint-pulse { 50% { opacity: .3; } }
+    .arrive-hint .line {
+      min-height: 1.45em; white-space: pre-wrap;
+      font: clamp(20px, 2.6vw, 32px)/1.45 "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+      color: #4dff88; text-shadow: 0 0 10px rgb(77 255 136 / 0.6);
     }
     .arrive-hint .cursor { display: inline-block; width: .6em; height: 1.1em; margin-left: 2px; vertical-align: -.18em;
       background: currentColor; box-shadow: 0 0 8px rgb(77 255 136 / 0.6); animation: hint-blink 1s steps(1) infinite; }
     @keyframes hint-blink { 50% { opacity: 0; } }
     .arrive-hint.gone { opacity: 0; }
-    /* the last message is in: the cursor blinks a few more times, then goes, and nothing more is coming */
+    /* the last line is in: the cursor blinks a few more times, then goes, and nothing more is coming */
     .arrive-hint.over .cursor { animation: hint-blink 1s steps(1) 3, hint-out .6s ease 3s forwards; }
     @keyframes hint-out { to { opacity: 0; } }
-    @media (prefers-reduced-motion: reduce) { .arrive-hint .cursor { display: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .arrive-hint { animation: none; }
+      .arrive-hint .dot { animation: none; }
+      .arrive-hint .cursor { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -500,35 +522,55 @@
       firstScene(function () { setTimeout(clear, 350); });
       setTimeout(clear, 6000);
 
-      // typed a key at a time, unevenly, with a pause after each sentence, under a blinking block cursor
+      // the panel flickers on; then each line is typed a key at a time, unevenly, under a blinking block cursor,
+      // a pause between lines, and they all stay
       function hint() {
         if (!arrive.hint) return;
-        var box = document.createElement('p'), text = document.createElement('span'), cursor = document.createElement('span');
+        var box = document.createElement('div'), cursor = document.createElement('span');
         box.className = 'arrive-hint';
         box.setAttribute('role', 'status');
+        if (arrive.head) {
+          var head = document.createElement('p'), dot = document.createElement('span');
+          head.className = 'head';
+          dot.className = 'dot';
+          head.append(dot, document.createTextNode(arrive.head));
+          box.append(head);
+        }
         cursor.className = 'cursor';
         cursor.setAttribute('aria-hidden', 'true');
-        box.append(text, cursor);
-        document.body.append(box);
-        // the messages, separated by | ("Knock, knock.|Find the listening booth."): like on Neo's monitor, each
-        // is typed, held, and cleared for the next; the last one stays
-        var messages = arrive.hint.split('|'), m = 0, i = 0, timer;
-        var longest = Math.max.apply(null, messages.map(function (t) { return Array.from(t).length; }));
+        var lines = arrive.hint.split('|').map(function (t) {
+          var el = document.createElement('div');
+          el.className = 'line';
+          box.append(el);
+          return { el: el, chars: Array.from(t) };
+        });
+        var longest = Math.max.apply(null, lines.map(function (l) { return l.chars.length; }));
         box.style.width = 'calc(' + (longest + 1) + 'ch + 4px)';
-        if (arrive.still) { text.textContent = messages.join('\n'); box.classList.add('over'); }
-        else (function type() {
-          var chars = Array.from(messages[m]);
-          if (i < chars.length) {
-            text.textContent += chars[i++];
-            timer = setTimeout(type, 55 + Math.random() * 110);
-          } else if (m < messages.length - 1) {
-            timer = setTimeout(function () {
-              text.textContent = '';
-              m++; i = 0;
-              timer = setTimeout(type, 500);
-            }, 1600);
-          } else box.classList.add('over');
-        })();
+        box.style.fontFamily = '"JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace';   // so ch is the lines' ch
+        box.style.fontSize = 'clamp(20px, 2.6vw, 32px)';
+        document.body.append(box);
+        var l = 0, i = 0, timer;
+        if (arrive.still) {
+          lines.forEach(function (line) { line.el.textContent = line.chars.join(''); });
+          box.classList.add('over');
+        } else {
+          lines.forEach(function (line, n) { if (n) line.el.style.display = 'none'; });
+          lines[0].el.append(cursor);
+          timer = setTimeout(function type() {
+            var line = lines[l];
+            if (i < line.chars.length) {
+              cursor.before(line.chars[i++]);
+              timer = setTimeout(type, 55 + Math.random() * 110);
+            } else if (l < lines.length - 1) {
+              timer = setTimeout(function () {
+                l++; i = 0;
+                lines[l].el.style.display = '';
+                lines[l].el.append(cursor);
+                timer = setTimeout(type, 400);
+              }, 1100);
+            } else box.classList.add('over');
+          }, 700);
+        }
         // gone once the reader leaves the first scene: as its transition video starts, or as another scene loads
         function gone() {
           if (box.classList.contains('gone')) return;
@@ -579,6 +621,7 @@
   </div>
 
   <script src="js/audio.js"></script>
+  <script src="js/scene-music.js"></script>
   <script src="js/nav-data.js"></script>
   <script>
     (function () {
@@ -675,7 +718,13 @@
       }
       window.addEventListener('message', function (e) {
         if (!e || !e.data || e.source !== frame.contentWindow) return;
-        if (e.data.type === 'city:scene') setChrome(true, false);
+        if (e.data.type === 'city:scene') {
+          setChrome(true, false);
+          // Some scenes have their own generated theme (js/scene-music.js); the rest play the playlist.
+          var audioApi = window.__CITY_AUDIO_API__;
+          var sceneFile = typeof e.data.file === 'string' ? (e.data.file.split('?')[0].split('/').pop() || '') : '';
+          if (audioApi && audioApi.setScene) audioApi.setScene(sceneFile);
+        }
         else if (e.data.type === 'city:chrome') setChrome(e.data.music !== false, e.data.immersive);
       });
 
@@ -782,6 +831,9 @@
           var enabled = api.getEnabled && api.getEnabled();
           var paused = api.isPaused && api.isPaused();
           var idx = api.getTrackIndex ? api.getTrackIndex() : 0;
+          var desc = document.getElementById('music-playlist-desc');
+          var themeName = api.getThemeName ? api.getThemeName() : '';
+          if (desc) desc.textContent = themeName ? 'Here: ' + themeName + ' · or pick a track by Moby' : 'Tracks by Moby';
           if (musicPlayPause) {
             musicPlayPause.textContent = (!enabled || paused) ? '▶ Play' : '⏸ Pause';
             musicPlayPause.setAttribute('aria-label', (!enabled || paused) ? 'Play' : 'Pause');
@@ -851,7 +903,7 @@
         } else {
           document.addEventListener('DOMContentLoaded', updateMusicSummary, { once: true });
         }
-        setInterval(updateMusicDropdown, 800);
+        setInterval(function () { updateMusicSummary(); updateMusicDropdown(); }, 800);
       }
 
       var fullscreenToggle = document.getElementById('fullscreen-toggle');
