@@ -447,6 +447,7 @@
 
       var currentSceneFile = 'entry.html';
       var dynamicLinks = Object.create(null);
+      var FALLBACK_LINKS = (window.CITY_NAV && window.CITY_NAV.doors) ? window.CITY_NAV.doors : Object.create(null);
 
       function normalizeScenePath(path) {
         if (!path) return path;
@@ -476,8 +477,6 @@
       if (window.location.hash && window.location.hash.length > 1) {
         setScene(window.location.hash.slice(1));
       }
-
-      var FALLBACK_LINKS = (window.CITY_NAV && window.CITY_NAV.doors) ? window.CITY_NAV.doors : Object.create(null);
 
       function addLinkToList(list, item) {
         var li = document.createElement('li');
