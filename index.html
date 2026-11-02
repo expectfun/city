@@ -6,7 +6,17 @@
   <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml">
   <link rel="shortcut icon" href="favicon.svg?v=2" type="image/svg+xml">
   <title>City</title>
-  <link rel="preload" as="video" href="pics/entry-transition.mp4" type="video/mp4">
+  <meta name="description" content="A rainy cyberpunk city to walk through: a library, an arcade, a rooftop, a hotel, a bar. Find your own way in.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="City">
+  <meta property="og:title" content="City">
+  <meta property="og:description" content="A rainy cyberpunk city to walk through: a library, an arcade, a rooftop, a hotel, a bar. Find your own way in.">
+  <meta property="og:url" content="https://expectfun.github.io/city/">
+  <meta property="og:image" content="https://expectfun.github.io/city/pics/share.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="A rainy neon street with signs for the arcade, the library, the rooftop and the workshop">
+  <meta name="twitter:card" content="summary_large_image">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     :root, [data-theme="dark"] {
@@ -625,7 +635,7 @@
   <iframe class="frame" id="city-frame" src="places/entry.html" title="City"></iframe>
   <div class="spot-overlay" id="spot-overlay" aria-hidden="true"></div>
   <div class="video-overlay" id="video-overlay" aria-hidden="true">
-    <video id="transition-video" preload="auto" muted playsinline src="pics/entry-transition.mp4"></video>
+    <video id="transition-video" preload="auto" muted playsinline></video>
   </div>
 
   <script src="js/audio.js"></script>
@@ -705,6 +715,28 @@
           for (var i = 0; i < items.length; i++) addLinkToList(list, items[i]);
         }
       }
+
+      // The address bar follows the reader: ?scene=library. Back/Forward already walk the frame's own
+      // history; this only keeps the top URL in step, so a reload or a shared link opens the same place.
+      function syncAddress() {
+        var loc;
+        try { loc = frame.contentWindow.location; } catch (_) { return; }
+        if (!loc || loc.href === 'about:blank') return;
+        var rel = loc.pathname.replace(/^.*?\/(places|tools|posts)\//, '$1/');
+        if (!/^(places|tools|posts)\//.test(rel)) return;
+        var scene = rel.indexOf('places/') === 0 && !loc.search
+          ? rel.slice(7).replace(/\.html$/, '')
+          : (rel.indexOf('places/') === 0 ? rel.slice(7) : rel) + loc.search;
+        var q = new URLSearchParams(window.location.search);
+        q.delete('s');
+        if (scene === 'entry') q.delete('scene'); else q.set('scene', scene);
+        var qs = q.toString().replace(/%2F/g, '/').replace(/%3F/g, '?').replace(/%3D/g, '=');
+        var url = window.location.pathname + (qs ? '?' + qs : '');
+        if (url !== window.location.pathname + window.location.search || window.location.hash) {
+          try { history.replaceState(history.state, '', url); } catch (_) {}
+        }
+      }
+      frame.addEventListener('load', syncAddress);
 
       window.addEventListener('message', function (e) {
         if (!e || !e.data || e.data.type !== 'city:scene') return;

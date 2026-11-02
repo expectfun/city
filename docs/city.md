@@ -101,6 +101,11 @@ All project JS was consolidated into `city/js/`:
 - `index.html` loads `places/entry.html` in iframe by default.
 - Shell route normalization maps bare scene names (`street.html`) to `places/street.html`.
 - `tools/*` and `posts/*` routes are allowed directly.
+- The address bar follows the reader (`index.html?scene=library`, nothing for the entry), kept in step with
+  `history.replaceState` on every frame load. Back/Forward come from the frame's own history; the URL only
+  makes a reload or a shared link open the same place.
+- The entry transition video (~2 MB) is only fetched when the visit starts at the entry, not on deep links.
+- Link previews: `og:`/`twitter:` tags in `index.html`, image `pics/share.jpg` (1200×630, from the street).
 - `gesture-bridge.js` remains the event bridge between scene iframe and shell.
 - A scene can trim the shell's corner buttons by posting `{ type: 'city:chrome', music, immersive }`:
   `music: false` hides the music button, `immersive: true` hides all corner buttons and the flashlight beam.
