@@ -436,17 +436,22 @@
       display: block; position: fixed; inset: 0; z-index: 10000; width: 100%; height: 100%;
       pointer-events: none; image-rendering: pixelated; transition: opacity 2s ease-in;
     }
+    /* in the upper middle, over the dead-channel sky and clear of the gateway; as wide as the longest message
+       from the start (set by the script), so the typing grows to the right without the box shifting */
     .arrive-hint {
-      position: fixed; top: 22px; left: 24px; z-index: 9999; max-width: calc(100vw - 48px); margin: 0;
-      padding: 10px 14px; border-radius: 4px; background: rgb(0 0 0 / 0.62); pointer-events: none;
-      font: 20px/1.5 "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace; color: #4dff88;
-      text-shadow: 0 0 8px rgb(77 255 136 / 0.6); white-space: pre-wrap; transition: opacity .6s ease;
+      position: fixed; top: 13vh; left: 50%; transform: translateX(-50%); z-index: 9999; box-sizing: content-box;
+      max-width: calc(100vw - 60px); margin: 0; padding: 14px 20px; border-radius: 5px; background: rgb(0 0 0 / 0.66);
+      pointer-events: none; font: clamp(20px, 2.6vw, 32px)/1.45 "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+      color: #4dff88; text-shadow: 0 0 10px rgb(77 255 136 / 0.6); white-space: pre-wrap; transition: opacity .6s ease;
     }
     .arrive-hint .cursor { display: inline-block; width: .6em; height: 1.1em; margin-left: 2px; vertical-align: -.18em;
       background: currentColor; box-shadow: 0 0 8px rgb(77 255 136 / 0.6); animation: hint-blink 1s steps(1) infinite; }
     @keyframes hint-blink { 50% { opacity: 0; } }
     .arrive-hint.gone { opacity: 0; }
-    @media (prefers-reduced-motion: reduce) { .arrive-hint .cursor { animation: none; } }
+    /* the last message is in: the cursor blinks a few more times, then goes, and nothing more is coming */
+    .arrive-hint.over .cursor { animation: hint-blink 1s steps(1) 3, hint-out .6s ease 3s forwards; }
+    @keyframes hint-out { to { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .arrive-hint .cursor { display: none; } }
   </style>
 </head>
 <body>
@@ -505,13 +510,24 @@
         cursor.setAttribute('aria-hidden', 'true');
         box.append(text, cursor);
         document.body.append(box);
-        var chars = Array.from(arrive.hint), i = 0, timer;
-        if (arrive.still) text.textContent = arrive.hint;
+        // the messages, separated by | ("Knock, knock.|Find the listening booth."): like on Neo's monitor, each
+        // is typed, held, and cleared for the next; the last one stays
+        var messages = arrive.hint.split('|'), m = 0, i = 0, timer;
+        var longest = Math.max.apply(null, messages.map(function (t) { return Array.from(t).length; }));
+        box.style.width = 'calc(' + (longest + 1) + 'ch + 4px)';
+        if (arrive.still) { text.textContent = messages.join('\n'); box.classList.add('over'); }
         else (function type() {
-          if (i >= chars.length) return;
-          var c = chars[i++];
-          text.textContent += c;
-          timer = setTimeout(type, /[.!?]/.test(c) && i < chars.length ? 1100 : 55 + Math.random() * 110);
+          var chars = Array.from(messages[m]);
+          if (i < chars.length) {
+            text.textContent += chars[i++];
+            timer = setTimeout(type, 55 + Math.random() * 110);
+          } else if (m < messages.length - 1) {
+            timer = setTimeout(function () {
+              text.textContent = '';
+              m++; i = 0;
+              timer = setTimeout(type, 500);
+            }, 1600);
+          } else box.classList.add('over');
         })();
         // gone once the reader leaves the first scene: as its transition video starts, or as another scene loads
         function gone() {
