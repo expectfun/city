@@ -116,9 +116,15 @@ what you recognise from where you've been. When a way isn't obvious, fix the pic
 - Square: the alley back to the street is drawn with the street's own signs (ROOFTOP, WORKSHOP,
   ARCADE) visible down it; a pink neon sign in the hotel's style points right to the Neo Tokyo Hotel.
 
-Possible later (not now, it works against immersion): hint labels like the booth's, flashing on
-entry and showing on hover ("↩ STREET", "NEO TOKYO HOTEL ▸"). Keep it as a fallback if people
-still get lost after the pictures are clear.
+- Booth: nothing is labelled. The door, the crates and the terminal (its screen already says
+  "READ ▸") explain themselves; an empty turntable opens the crates. Two cues remain where a click
+  does something you can't guess: on hover over the turntable once a record is on, "▶ PLAY" /
+  "❚❚ PAUSE"; and on the TV, a small "⛶" in the corner of the picture (like a TV's on-screen
+  display) saying it can be watched bigger.
+
+Possible later (not now, it works against immersion): the same hover labels in the other scenes
+("↩ STREET", "NEO TOKYO HOTEL ▸"). Keep it as a fallback if people still get lost after the
+pictures are clear.
 
 ## Listening booth
 

@@ -122,7 +122,8 @@
     body.loaded .label-tint { opacity: 0.8; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Labels that say what each thing in the booth does: flash on entry, then on hover. */
+    /* The only label left: on hover over the turntable once a record is on, since a click there then
+       plays/pauses instead of opening the crates. Everything else explains itself (see "Wayfinding" in docs/city.md). */
     .hints { position: absolute; inset: 0; pointer-events: none; }
     .hint {
       position: absolute;
@@ -140,7 +141,7 @@
       opacity: 0;
       transition: opacity 0.35s;
     }
-    .hints.intro .hint, .hint.show { opacity: 1; }
+    .hint.show { opacity: 1; }
 
     /* ---------- the TV/video element: in the TV set, full view (theater), or the terminal's feed slot ---------- */
     .crt {
@@ -167,6 +168,22 @@
         repeating-linear-gradient(0deg, rgb(0 0 0 / 0.20) 0 1px, transparent 1px 3px);
       box-shadow: inset 0 0 14px rgb(0 0 0 / 0.7);
     }
+    /* The TV's on-screen mark: in the booth, once a record is on, a corner glyph says the picture can get bigger. */
+    .crt { container-type: size; }
+    .crt-osd {
+      position: absolute;
+      right: 10%;
+      bottom: 11%;
+      z-index: 1;
+      pointer-events: none;
+      color: rgb(235 245 255 / 0.85);
+      font: 700 clamp(12px, 14cqh, 36px)/1 var(--mono);
+      text-shadow: 0 0 6px rgb(150 210 255 / 0.8), 0 0 2px rgb(0 0 0 / 0.9);
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    body.loaded .crt-osd { opacity: 1; }
+    body.term-open .crt-osd, body.theater-open .crt-osd { opacity: 0; }
     /* Sized and scaled from JS: YouTube needs at least 200x200 CSS px, so small screens render big and shrink. */
     .crt-video { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
     .crt-video iframe, .crt-video #ytMount {
@@ -700,7 +717,6 @@
       .term-body { flex-direction: column; overflow-y: auto; }
       .term-scroll { flex: none; overflow: visible; }
       .term-side { order: -1; width: auto; padding: 0.75rem 0.75rem 0; }
-      .hint[data-for="hsTv"], .hint[data-for="hsTerm"] { display: none; }
       .term-list { display: none; }
       .term-scroll { padding: 1.25rem 1rem 3rem; }
       .term-text { font-size: 14.5px; }
@@ -766,11 +782,7 @@
     </svg>
 
     <div class="hints" id="hints" aria-hidden="true">
-      <span class="hint" data-for="hsDoor">↩ UPPER FLOOR</span>
-      <span class="hint" data-for="hsCrates">RECORDS</span>
-      <span class="hint" data-for="hsDeck" id="deckHint">PICK A RECORD</span>
-      <span class="hint" data-for="hsTv" data-pos="top">⛶ WATCH</span>
-      <span class="hint" data-for="hsTerm" data-pos="top">READ ▸</span>
+      <span class="hint" data-for="hsDeck" id="deckHint">▶ PLAY</span>
     </div>
 
     <a href="../index.html" target="_top" class="standalone-exit" aria-label="Exit to main site">Exit</a>
@@ -785,6 +797,7 @@
 
   <div class="crt" id="crt" aria-hidden="true">
     <div class="crt-video" id="crtVideo"><div id="ytMount"></div></div>
+    <span class="crt-osd" aria-hidden="true">⛶</span>
     <div class="crt-idle" id="crtIdle"><div><span class="in-booth">-- NO SIGNAL --<br>PICK A RECORD</span><span class="in-term">-- NO SIGNAL --<br>PRESS P OR PICK A TRACK</span><br><span class="blink">█</span></div></div>
   </div>
 
@@ -1046,17 +1059,12 @@
       var bgImg = $('bgImg');
       if (!bgImg.complete) bgImg.addEventListener('load', layout, { once: true });
 
-      var hints = $('hints');
-      hints.classList.add('intro');
-      setTimeout(function () { hints.classList.remove('intro'); }, 3800);
       function hintFor(id) { return document.querySelector('.hint[data-for="' + id + '"]'); }
       function hoverHint(el, id) {
-        ['mouseenter', 'focus'].forEach(function (ev) { el.addEventListener(ev, function () { if (inBooth()) hintFor(id).classList.add('show'); }); });
+        ['mouseenter', 'focus'].forEach(function (ev) { el.addEventListener(ev, function () { if (inBooth() && document.body.classList.contains('loaded')) hintFor(id).classList.add('show'); }); });
         ['mouseleave', 'blur'].forEach(function (ev) { el.addEventListener(ev, function () { hintFor(id).classList.remove('show'); }); });
       }
-      ['hsDoor', 'hsCrates', 'hsDeck', 'hsTv', 'hsTerm'].forEach(function (id) { hoverHint($(id), id); });
-      hoverHint(crt, 'hsTv');
-      hoverHint(termScreen, 'hsTerm');
+      hoverHint($('hsDeck'), 'hsDeck');
 
       /* ---------- the city's corner buttons ---------- */
       // The booth plays its own music, so the city's music button goes; full-screen views hide them all.
@@ -1333,8 +1341,9 @@
         document.body.classList.toggle('playing', playing);
         document.body.classList.toggle('cueing', cueing && !playing);
         document.body.classList.toggle('loaded', !!t);
-        // An empty turntable can't play: until a record is on, it opens the crates.
-        $('deckHint').textContent = t ? '▶ PLAY / PAUSE' : 'PICK A RECORD';
+        // An empty turntable opens the crates, which says enough; with a record on, the label names what a click does.
+        $('deckHint').textContent = playing ? '❚❚ PAUSE' : '▶ PLAY';
+        if (!t) $('deckHint').classList.remove('show');
         $('btnPlay').textContent = playing ? '⏸' : '▶';
         $('btnPlay').setAttribute('aria-label', playing ? 'Pause' : 'Play');
         $('tPlay').textContent = playing ? '[⏸]' : '[▶]';
