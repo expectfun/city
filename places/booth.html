@@ -110,6 +110,8 @@
       pointer-events: none;
     }
     body.playing .sheen { animation-play-state: running; opacity: 1; }
+    /* Behind the reader or the video the record can't be seen: don't keep the GPU busy spinning it. */
+    body.term-open .sheen, body.theater-open .sheen { animation-play-state: paused; }
     .label-tint {
       fill: var(--side);
       opacity: 0;
@@ -464,9 +466,11 @@
       background:
         repeating-linear-gradient(0deg, rgb(0 0 0 / 0.16) 0 1px, transparent 1px 3px),
         radial-gradient(ellipse at 50% 50%, transparent 60%, rgb(0 0 0 / 0.55) 100%);
-      animation: flicker 6s infinite;
     }
-    @keyframes flicker { 0%, 100% { opacity: 1; } 48% { opacity: 0.94; } 50% { opacity: 1; } 51% { opacity: 0.9; } }
+    /* The flicker is a short burst started from JS every few seconds: an infinite animation would
+       redraw the whole screen every frame even while it holds still, and that heats laptops. */
+    .term.flick::after { animation: flicker 0.4s; }
+    @keyframes flicker { 0%, 100% { opacity: 1; } 30% { opacity: 0.94; } 55% { opacity: 1; } 65% { opacity: 0.9; } }
     .term ::selection { background: var(--ph); color: var(--ph-bg); text-shadow: none; }
     .term button { font-family: var(--mono); }
 
@@ -1203,6 +1207,11 @@
           termScroll.focus({ preventScroll: true });
         });
       }
+      setInterval(function () {
+        if (!termOpen || document.hidden || reduceMotion()) return;
+        term.classList.add('flick');
+        setTimeout(function () { term.classList.remove('flick'); }, 450);
+      }, 6000);
       function closeTerm() {
         if (!termOpen) return;
         termOpen = false;
