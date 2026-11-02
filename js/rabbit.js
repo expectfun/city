@@ -14,6 +14,7 @@
   var style = document.createElement('style');
   style.textContent =
     '.rabbit { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transform: scale(1.02); }' +
+    '.rabbit > g { transition: opacity .35s ease; }' +   // it appears softly where its run starts
     '.rabbit .fur { fill: #edf1f7; }' +
     '.rabbit .who { filter: drop-shadow(0 0 3px rgb(255 255 255 / 0.35)); transition: opacity .4s ease; }' +
     '.rabbit .shadow { fill: rgb(0 0 0 / 0.45); }' +
