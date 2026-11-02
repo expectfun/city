@@ -458,6 +458,8 @@
           if (path.indexOf('places/') === 0 || path.indexOf('tools/') === 0 || path.indexOf('posts/') === 0) return path;
           return '';
         }
+        var bare = /^([a-z0-9_-]+)(\?.*)?$/i.exec(path);
+        if (bare && FALLBACK_LINKS[bare[1] + '.html']) path = bare[1] + '.html' + (bare[2] || '');
         if (!/\.html($|\?)/i.test(path)) return '';
         if (path === 'index.html') return path;
         return 'places/' + path;
