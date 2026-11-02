@@ -137,6 +137,9 @@ what you recognise from where you've been. When a way isn't obvious, fix the pic
 - Square: the alley back to the street is drawn with the street's own signs (ROOFTOP, WORKSHOP,
   ARCADE) visible down it; a pink neon sign in the hotel's style points right to the Neo Tokyo Hotel.
 
+- White rabbit (`js/rabbit.js`): a trail from the street to the booth (street → library → stairs → booth door).
+  It isn't there when a scene opens; after 5 s it fades in like a hologram switching on, a hint for whoever
+  lingers. Once the booth has been found it appears no more (`city-rabbit-done` in `localStorage`).
 - Booth: nothing is labelled. The door, the crates and the terminal (its screen already says
   "READ ▸") explain themselves; an empty turntable opens the crates. Two cues remain where a click
   does something you can't guess: on hover over the turntable once a record is on, "▶ PLAY" /

@@ -1,19 +1,33 @@
 // The white rabbit: a quiet trail from the City's entry to the listening booth, where the Longplay posts are
 // read. On the street, in the library and upstairs it sits by the way on (under the LIBRARY sign, halfway up the
-// stairs, at the booth door), there as the scene loads, twitching an ear now and then. Not clickable: the
-// scene's own hotspots work as before. (It used to hop in to its spot; the run is in git history, f2ba95d.)
+// stairs, at the booth door), twitching an ear now and then. Not clickable: the scene's own hotspots work as before.
+// It isn't there when a scene opens: the visitor looks around first. After APPEAR_DELAY it fades in like a
+// hologram switching on, a hint for whoever lingers. Once the booth has been found (booth.html sets
+// city-rabbit-done in localStorage), it has done its job and appears no more.
+// (It used to hop in to its spot; the run is in git history, f2ba95d.)
 // A scene sets window.CITY_RABBIT before loading this:
 //   { at: [x, y, scale], facing: 1 }
 // in the scene's 1376 × 768 picture coordinates; scale is for perspective, facing -1 turns it to the left.
 (function () {
   var cfg = window.CITY_RABBIT, scene = document.querySelector('.scene');
   if (!cfg || !scene || !cfg.at) return;
+  try { if (localStorage.getItem('city-rabbit-done') === '1') return; } catch (_) {}
+  var APPEAR_DELAY = 5000;
   var NS = 'http://www.w3.org/2000/svg';
   var still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   var style = document.createElement('style');
   style.textContent =
-    '.rabbit { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transform: scale(1.02); }' +
+    '.rabbit { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; transform: scale(1.02); opacity: 0; }' +
+    // Appearing: a few flickers, cyan at first, settling into its white glow.
+    '.rabbit.appear { animation: rabbit-appear 2.6s ease-out forwards; }' +
+    '.rabbit.appear .fur { animation: rabbit-tint 2.6s ease-out forwards; }' +
+    '@keyframes rabbit-appear { 0% { opacity: 0; } 12% { opacity: .32; } 16% { opacity: .06; } 28% { opacity: .5; } 32% { opacity: .18; }' +
+    ' 46% { opacity: .66; } 50% { opacity: .42; } 100% { opacity: 1; } }' +
+    '@keyframes rabbit-tint { 0%, 40% { fill: #9ff4ff; } 100% { fill: #edf1f7; } }' +
+    '.rabbit.appear.still { animation: rabbit-fade 2.5s ease-out forwards; }' +
+    '.rabbit.appear.still .fur { animation: none; }' +
+    '@keyframes rabbit-fade { to { opacity: 1; } }' +
     '.rabbit .fur { fill: #edf1f7; }' +
     '.rabbit .who { filter: drop-shadow(0 0 3px rgb(255 255 255 / 0.35)); }' +
     '.rabbit .shadow { fill: rgb(0 0 0 / 0.45); }' +
@@ -48,6 +62,9 @@
   g.setAttribute('transform', 'translate(' + x + ' ' + y + ') scale(' + s * dir + ' ' + s + ')');
   svg.appendChild(g);
   scene.insertBefore(svg, scene.querySelector('.hotspots'));   // under the hotspots, which stay clickable through it
+
+  if (still) svg.classList.add('still');
+  setTimeout(function () { svg.classList.add('appear'); }, APPEAR_DELAY);
 
   if (still) return;
   var ear = g.querySelector('.ear-front');
