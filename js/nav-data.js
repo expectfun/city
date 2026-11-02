@@ -48,7 +48,8 @@
         { href: 'street.html', text: 'Exit to Street' },
         { href: 'posts/jagged-intelligence.html', text: 'Jagged Intelligence - original' },
         { href: 'https://addyosmani.com/blog/good-spec/', text: 'Good Spec - original', external: true },
-        { href: 'https://expectfun.github.io/longplay/cybersound/', text: 'Cybersound - original', external: true }
+        { href: 'https://expectfun.github.io/longplay/cyberpunk2020-en/', text: 'Cyberpunk 2020 - original (EN)', external: true },
+        { href: 'https://expectfun.github.io/longplay/cyberpunk2020/', text: 'Киберпанк 2020 - original (RU)', external: true }
       ],
       'tablet.html': [
         { href: 'terminal.html', text: 'Back to Terminal' },
