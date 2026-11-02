@@ -106,10 +106,14 @@ All project JS was consolidated into `city/js/`:
   `music: false` hides the music button, `immersive: true` hides all corner buttons and the flashlight beam.
   The shell resets both on every `city:scene` message, so other scenes are unaffected.
 - City music (`js/audio.js`): one playlist that carries over from scene to scene, not tied to places.
-  Track 1, "Rain Alley", is generated live in the browser (`js/live-music.js`, Tone.js from cdnjs:
-  original music, no audio file, no GitHub Pages bandwidth); the three Moby mp3s (`audio/`, ~26 MB
-  together) download only when someone picks one in the music menu. After the last Moby track the
-  playlist wraps to Rain Alley.
+  The first three tracks are generated live in the browser (`js/live-music.js`, Tone.js from cdnjs:
+  original music, no audio file, no GitHub Pages bandwidth), each in a different mood:
+  "Rain Alley" (the default: slow, melancholic synthwave under rain), "Night Drive" (fast, bright
+  outrun) and "Ghost Signal" (dark, slow film-score ambience). Chords, tempo, sounds and sections are
+  fixed; arps, melody notes and details are picked at random as it plays, so it never repeats exactly.
+  A live track never ends, so after ~4.5 minutes the playlist moves on to the next live one, and never
+  by itself to an mp3: the three Moby mp3s (`audio/`, ~26 MB together) download only when someone picks
+  one in the music menu. After the last Moby track the playlist wraps back to the live tracks.
 - Music is on by default for a new visitor and starts on their first click (usually entry → street);
   the music button glows a few times then, so it's easy to find. Turning music off (or on) is
   remembered in `localStorage` (`city-music-enabled`).

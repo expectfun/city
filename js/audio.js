@@ -1,7 +1,8 @@
 /**
  * City soundtrack — a playlist that carries over from scene to scene.
- * Track 1 is generated live in the browser (js/live-music.js: no audio file, no bandwidth) and is
- * the default; the Moby mp3s only download when someone picks one. Two <audio> elements crossfade
+ * The first tracks are generated live in the browser (js/live-music.js: no audio file, no bandwidth);
+ * Rain Alley is the default. A live track never ends, so after LIVE_SECS the playlist moves on to the
+ * next live one, and never on its own to an mp3: the Moby tracks only download when someone picks one. Two <audio> elements crossfade
  * the mp3s; volume-based, no Web Audio API for them.
  *
  * Music is on by default for a new visitor and starts with their first click (browsers allow no
@@ -20,6 +21,8 @@
 
   var TRACKS = [
     { live: 'rain-alley', name: 'Rain Alley (live synth)' },
+    { live: 'night-drive', name: 'Night Drive (live synth)' },
+    { live: 'ghost-signal', name: 'Ghost Signal (live synth)' },
     { src: 'audio/lights.mp3', name: 'Bring the Big Lights' },
     { src: 'audio/aeron.mp3', name: 'Aeron 95' },
     { src: 'audio/discontent.mp3', name: 'Discontent' }
@@ -28,6 +31,8 @@
   var VOLUME = 0.38;
   var FADE_MS = 1200;
   var XFADE_MS = 2000;
+  var LIVE_SECS = 270;
+  var liveSecs = 0;
 
   var storedChoice = null;
   try { storedChoice = localStorage.getItem('city-music-enabled'); } catch (_) {}
@@ -148,6 +153,7 @@
     var nextTrack = (trackIdx + 1) % TRACKS.length;
     if (isLive(nextTrack)) {
       trackIdx = nextTrack;
+      liveSecs = 0;
       apply();
       return;
     }
@@ -238,6 +244,19 @@
   function getTrackName() { return TRACKS[trackIdx].name; }
   function getTracks() { return TRACKS.slice(); }
   function getTrackIndex() { return trackIdx; }
+
+  // Live tracks take turns: count the seconds one is actually heard, then hand over to the next live one.
+  function liveClock() {
+    if (!isLive(trackIdx) || !shouldPlay()) return;
+    var l = live();
+    if (!l || !l.isPlaying()) return;
+    if (++liveSecs < LIVE_SECS) return;
+    var next = trackIdx;
+    do { next = (next + 1) % TRACKS.length; } while (!isLive(next));
+    trackIdx = next;
+    liveSecs = 0;
+    apply();
+  }
   function isPaused() {
     if (!enabled) return true;
     if (isLive(trackIdx)) { var l = live(); return !(l && l.isPlaying()); }
@@ -258,6 +277,7 @@
   function playTrackAtIndex(idx) {
     if (idx < 0 || idx >= TRACKS.length) return;
     trackIdx = idx;
+    liveSecs = 0;
     userPaused = false;
     gestureSeen = true;
     if (!enabled) setEnabled(true);
@@ -309,6 +329,7 @@
       } catch (_) {}
     }, { passive: true });
     armAutostart();
+    setInterval(liveClock, 1000);
     if (enabled) {
       try {
         if (navigator.userActivation && navigator.userActivation.hasBeenActive) kick();
