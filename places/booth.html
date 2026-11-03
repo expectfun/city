@@ -957,8 +957,14 @@
       window.addEventListener('pageshow', function (e) { if (e.persisted) holdCity(true); });
 
       // The white rabbit (js/rabbit.js) led here: its job is done, it won't appear again,
-      // and a message from Longplay that called it back has been answered.
-      try { localStorage.setItem('city-rabbit-done', '1'); sessionStorage.removeItem('city-rabbit-call'); } catch (_) {}
+      // and a message from Longplay that called it back here has been answered.
+      try {
+        localStorage.setItem('city-rabbit-done', '1');
+        if ((sessionStorage.getItem('city-rabbit-to') || 'booth') === 'booth') {
+          sessionStorage.removeItem('city-rabbit-call');
+          sessionStorage.removeItem('city-rabbit-to');
+        }
+      } catch (_) {}
 
       /* ---------- placing the TV, the terminal screen and the hint labels over the image ---------- */
       var termOpen = false;

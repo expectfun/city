@@ -747,6 +747,15 @@ Sure, everyone and their bear is writing about AI now, making you sick of readin
     })();
   </script>
   <script src="../js/longplay-only.js"></script>
+  <script>
+    // A message from Longplay sent the white rabbit (js/rabbit.js) to lead here, to the Cyberpunk 2020 posts: answered.
+    try {
+      if (sessionStorage.getItem('city-rabbit-to') === 'terminal') {
+        sessionStorage.removeItem('city-rabbit-call');
+        sessionStorage.removeItem('city-rabbit-to');
+      }
+    } catch (_) {}
+  </script>
   <script src="../js/gesture-bridge.js"></script>
 </body>
 </html>

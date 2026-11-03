@@ -430,8 +430,9 @@
     // it every visitor's way in. The post also leaves a message in its own language: 'city-hint', its lines
     // separated by |, and 'city-hint-head', the header. A few seconds after the static has cleared it comes in
     // on the City's HUD, typed like the messages on Neo's monitor, then folds into a chip that stays with the
-    // reader (kept for this tab as 'city-msg') until they reach the listening booth, where it leads.
-    // The message also calls the white rabbit back ('city-rabbit-call'), even if the booth was found before.
+    // reader (kept for this tab as 'city-msg') until they reach where it leads: 'city-hint-to', the listening
+    // booth (the default: Cybersound) or the library terminal (Cyberpunk 2020). The message also calls the white
+    // rabbit back ('city-rabbit-call', 'city-rabbit-to'), on the trail to that place, even if it retired before.
     (function () {
       var STATIC_FOR_ALL = false;
       var arrive = { static: false, msg: null, fresh: false };
@@ -439,11 +440,14 @@
         arrive.static = sessionStorage.getItem('city-arrive') === 'static';
         var hint = sessionStorage.getItem('city-hint') || '', head = sessionStorage.getItem('city-hint-head') || '';
         ['city-arrive', 'city-hint', 'city-hint-head'].forEach(function (k) { sessionStorage.removeItem(k); });
+        var to = sessionStorage.getItem('city-hint-to') === 'terminal' ? 'terminal' : 'booth';   // where the post waits
+        sessionStorage.removeItem('city-hint-to');
         if (hint) {
-          arrive.msg = { hint: hint, head: head, read: false };
+          arrive.msg = { hint: hint, head: head, read: false, to: to };
           arrive.fresh = true;
           sessionStorage.setItem('city-msg', JSON.stringify(arrive.msg));
           sessionStorage.setItem('city-rabbit-call', '1');
+          sessionStorage.setItem('city-rabbit-to', to);
         } else {
           arrive.msg = JSON.parse(sessionStorage.getItem('city-msg') || 'null');
         }
@@ -548,9 +552,9 @@
       // the message's state, see hint() below
       var READ_MS = 4500, msg = arrive.msg, state = 'none';   // none, typing, open, folded, gone
       var box, lines, chip, cursor, timer;
-      // listening from the start: the first scene may already be the booth
+      // listening from the start: the first scene may already be where the message leads
       window.addEventListener('message', function (e) {
-        if (e.data && e.data.type === 'city:scene' && e.data.file === 'booth.html') retire();
+        if (e.data && e.data.type === 'city:scene' && msg && e.data.file === (msg.to || 'booth') + '.html') retire();
       });
       firstScene(watch);
       if (!arrive.static) {
@@ -585,7 +589,7 @@
       // a short pause between lines. READ_MS after the last line (time to read it) it folds into a chip in its
       // corner: a message waiting, "1" until it has been read. A click on the chip opens the whole message again,
       // untyped; a click on it, Esc, or a click in the scene closes it. Leaving the first scene before the message
-      // is all in folds it at once, still unread. In the listening booth, where it leads, it has done its job.
+      // is all in folds it at once, still unread. Where it leads (the booth or the terminal), it has done its job.
       function save() { try { sessionStorage.setItem('city-msg', JSON.stringify(msg)); } catch (_) {} }
 
       function panel() {
@@ -692,7 +696,7 @@
         state = 'typing';   // so fold() takes it
         fold();
       }
-      // the booth: what the message pointed at. The chip flickers off, and the message is gone for good.
+      // the booth or the terminal: what the message pointed at. The chip flickers off, and the message is gone for good.
       function retire() {
         if (state === 'gone') return;
         clearTimeout(timer);

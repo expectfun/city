@@ -9,11 +9,18 @@
 // A scene sets window.CITY_RABBIT before loading this:
 //   { at: [x, y, scale], facing: 1 }
 // in the scene's 1376 × 768 picture coordinates; scale is for perspective, facing -1 turns it to the left.
+// The message names where the post waits (city-rabbit-to: booth, the default, or terminal), and the trail splits in
+// the library. A scene can give the rabbit another spot on the way to one of them, or none (null):
+//   { at: [...], to: { terminal: { at: [...] } } }
 (function () {
   var cfg = window.CITY_RABBIT, scene = document.querySelector('.scene');
+  var called = false, dest = 'booth';
+  try {
+    called = sessionStorage.getItem('city-rabbit-call') === '1';
+    if (called) dest = sessionStorage.getItem('city-rabbit-to') || 'booth';
+  } catch (_) {}
+  if (cfg && cfg.to && dest in cfg.to) cfg = cfg.to[dest];
   if (!cfg || !scene || !cfg.at) return;
-  var called = false;
-  try { called = sessionStorage.getItem('city-rabbit-call') === '1'; } catch (_) {}
   try { if (!called && localStorage.getItem('city-rabbit-done') === '1') return; } catch (_) {}
   var APPEAR_DELAY = called ? 2500 : 5000;
   var NS = 'http://www.w3.org/2000/svg';
