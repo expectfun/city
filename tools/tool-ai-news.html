@@ -196,6 +196,8 @@
       .bg { transform: none; }
     }
   </style>
+  <!-- walking between scenes: the browser crossfades the two pages; the late picture fades in (js/gesture-bridge.js) -->
+  <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.4s; } img.bg.arriving { opacity: 0; } img.bg.arrived { transition: opacity 0.5s; } }</style>
 </head>
 <body>
   <script>if (window.self !== window.top) document.body.classList.add('in-shell');</script>

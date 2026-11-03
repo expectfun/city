@@ -9,6 +9,22 @@
   }
   if (!isInFrame) return;
 
+  // Walking from scene to scene the browser crossfades the two pages (the @view-transition rule in each
+  // page's head). On a slow connection the picture may not be in yet: rather than popping in after the
+  // fade, it fades in too, once it has arrived (img.bg.arriving / .arrived, same rule).
+  try {
+    var bg = document.querySelector('img.bg');
+    if (bg && !bg.complete) {
+      bg.classList.add('arriving');
+      var arrive = function () {
+        bg.classList.add('arrived');
+        requestAnimationFrame(function () { bg.classList.remove('arriving'); });
+      };
+      bg.addEventListener('load', arrive, { once: true });
+      bg.addEventListener('error', arrive, { once: true });
+    }
+  } catch (_) {}
+
   function safeText(s) {
     return (s || '').replace(/\s+/g, ' ').trim();
   }

@@ -139,6 +139,8 @@
     body:not(.in-shell):not(.embedded) .lab { padding-top: 3.6rem; }
     @media (prefers-reduced-motion: reduce) { body.playing .layer-bar { animation: none; } }
   </style>
+  <!-- walking between scenes: the browser crossfades the two pages; the late picture fades in (js/gesture-bridge.js) -->
+  <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.4s; } img.bg.arriving { opacity: 0; } img.bg.arrived { transition: opacity 0.5s; } }</style>
 </head>
 <body>
   <script>

@@ -104,6 +104,11 @@ All project JS was consolidated into `city/js/`:
 - The address bar follows the reader (`index.html?scene=library`, nothing for the entry), kept in step with
   `history.replaceState` on every frame load. Back/Forward come from the frame's own history; the URL only
   makes a reload or a shared link open the same place.
+- Walking between scenes crossfades (0.4 s, a cross-document view transition): a one-line `<style>` with
+  `@view-transition` in the head of every place and tool page (both pages must opt in, and inline it works even
+  before any script has loaded). If the next picture isn't in yet, `gesture-bridge.js` fades it in when it
+  arrives instead of letting it pop. Firefox and reduced motion: the instant switch, as before.
+  New pages need the same `<style>` line.
 - The entry transition video (~2 MB) is only fetched when the visit starts at the entry, not on deep links.
 - Link previews: `og:`/`twitter:` tags in `index.html`, image `pics/share.jpg` (1200×630, from the street).
 - `gesture-bridge.js` remains the event bridge between scene iframe and shell.
