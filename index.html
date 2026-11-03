@@ -491,6 +491,10 @@
     .arrive-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: #4dff88; box-shadow: 0 0 8px #4dff88;
       animation: hint-pulse 1.6s ease-in-out infinite; }
     .arrive-chip.read .count { display: none; }
+    /* read: an envelope says what the quiet chip is */
+    .arrive-chip .env { display: none; width: 15px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.4;
+      stroke-linejoin: round; filter: drop-shadow(0 0 3px rgb(77 255 136 / 0.6)); }
+    .arrive-chip.read .env { display: block; }
     .arrive-chip.read .dot { animation: none; opacity: .55; }
     .arrive-chip.gone { opacity: 0; pointer-events: none; }
     body.chrome-immersive .arrive-chip, body.chrome-immersive .arrive-hint { opacity: 0; visibility: hidden; }
@@ -662,7 +666,8 @@
           chip.type = 'button';
           chip.className = 'arrive-chip online';
           chip.title = msg.head || 'Message';
-          chip.innerHTML = '<span class="dot" aria-hidden="true"></span><span class="count">1</span>';
+          chip.innerHTML = '<span class="dot" aria-hidden="true"></span><span class="count">1</span>' +
+            '<svg class="env" viewBox="0 0 16 12" aria-hidden="true"><rect x="1" y="1" width="14" height="10" rx="1.5"/><path d="M1.5 1.8 8 7l6.5-5.2"/></svg>';
           chip.addEventListener('click', function () { if (state === 'open') close(); else open(); });
           chip.addEventListener('animationend', function () { chip.classList.remove('online'); });
           document.body.append(chip);

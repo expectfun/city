@@ -1,4 +1,4 @@
-// The white rabbit: a quiet trail from the City's entry to the listening booth, where the Longplay posts are
+// The white rabbit: a quiet trail from the City's entry (riding the ferry to the gateway) to the listening booth, where the Longplay posts are
 // read. On the street, in the library and upstairs it sits by the way on (under the LIBRARY sign, halfway up the
 // stairs, at the booth door), twitching an ear now and then. Not clickable: the scene's own hotspots work as before.
 // It isn't there when a scene opens: the visitor looks around first. After APPEAR_DELAY it fades in like a
