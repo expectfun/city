@@ -429,15 +429,24 @@
     // and lets it clear once the first scene has loaded. ?static shows it on any visit; STATIC_FOR_ALL would make
     // it every visitor's way in. The post also leaves a message in its own language: 'city-hint', its lines
     // separated by |, and 'city-hint-head', the header. A few seconds after the static has cleared it comes in
-    // on the City's HUD, typed like the messages on Neo's monitor, and stays until the reader leaves the first scene.
+    // on the City's HUD, typed like the messages on Neo's monitor, then folds into a chip that stays with the
+    // reader (kept for this tab as 'city-msg') until they reach the listening booth, where it leads.
+    // The message also calls the white rabbit back ('city-rabbit-call'), even if the booth was found before.
     (function () {
       var STATIC_FOR_ALL = false;
-      var arrive = { static: false, hint: '', head: '' };
+      var arrive = { static: false, msg: null, fresh: false };
       try {
         arrive.static = sessionStorage.getItem('city-arrive') === 'static';
-        arrive.hint = sessionStorage.getItem('city-hint') || '';
-        arrive.head = sessionStorage.getItem('city-hint-head') || '';
+        var hint = sessionStorage.getItem('city-hint') || '', head = sessionStorage.getItem('city-hint-head') || '';
         ['city-arrive', 'city-hint', 'city-hint-head'].forEach(function (k) { sessionStorage.removeItem(k); });
+        if (hint) {
+          arrive.msg = { hint: hint, head: head, read: false };
+          arrive.fresh = true;
+          sessionStorage.setItem('city-msg', JSON.stringify(arrive.msg));
+          sessionStorage.setItem('city-rabbit-call', '1');
+        } else {
+          arrive.msg = JSON.parse(sessionStorage.getItem('city-msg') || 'null');
+        }
       } catch (_) {}
       if (/[?&]static(=|&|$)/.test(location.search)) arrive.static = true;
       if (STATIC_FOR_ALL) arrive.static = true;
@@ -463,9 +472,28 @@
       border: 1px solid rgb(var(--accent-rgb) / 0.28); border-radius: 12px; background: rgb(6 12 18 / 0.55);
       backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       box-shadow: 0 0 24px rgb(var(--accent-rgb) / 0.08), inset 0 1px 0 rgb(255 255 255 / 0.04);
-      transition: opacity .6s ease;
-      animation: hint-online .5s steps(1) both;   /* a HUD element coming online */
+      transform-origin: 0 0; transition: opacity .45s ease, transform .45s ease;
     }
+    .arrive-hint.online, .arrive-chip.online { animation: hint-online .5s steps(1) both; }   /* a HUD element coming online */
+    /* folded into the chip in its corner; opened again from it, the whole message at once */
+    .arrive-hint.folded { opacity: 0; transform: scale(.12); visibility: hidden;
+      transition: opacity .45s ease, transform .45s ease, visibility 0s .45s; }
+    .arrive-hint.held { pointer-events: auto; cursor: pointer; }
+    .arrive-chip {
+      position: fixed; top: 10vh; left: 6vw; z-index: 9998; display: flex; align-items: center; gap: 8px;
+      margin: 0; padding: 7px 12px; border: 1px solid rgb(var(--accent-rgb) / 0.28); border-radius: 999px;
+      background: rgb(6 12 18 / 0.55); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 0 18px rgb(var(--accent-rgb) / 0.08); cursor: pointer;
+      font: 600 12px/1 "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace; color: #4dff88;
+      text-shadow: 0 0 8px rgb(77 255 136 / 0.6); transition: opacity .6s ease;
+    }
+    .arrive-chip:hover, .arrive-chip:focus-visible { border-color: rgb(77 255 136 / 0.55); outline: none; }
+    .arrive-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: #4dff88; box-shadow: 0 0 8px #4dff88;
+      animation: hint-pulse 1.6s ease-in-out infinite; }
+    .arrive-chip.read .count { display: none; }
+    .arrive-chip.read .dot { animation: none; opacity: .55; }
+    .arrive-chip.gone { opacity: 0; pointer-events: none; }
+    body.chrome-immersive .arrive-chip, body.chrome-immersive .arrive-hint { opacity: 0; visibility: hidden; }
     @keyframes hint-online { 0% { opacity: 0; } 15% { opacity: .7; } 30% { opacity: .1; } 50% { opacity: 1; } 65% { opacity: .45; } 80%, 100% { opacity: 1; } }
     .arrive-hint .head {
       display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
@@ -483,13 +511,12 @@
     .arrive-hint .cursor { display: inline-block; width: .6em; height: 1.1em; margin-left: 2px; vertical-align: -.18em;
       background: currentColor; box-shadow: 0 0 8px rgb(77 255 136 / 0.6); animation: hint-blink 1s steps(1) infinite; }
     @keyframes hint-blink { 50% { opacity: 0; } }
-    .arrive-hint.gone { opacity: 0; }
     /* the last line is in: the cursor blinks a few more times, then goes, and nothing more is coming */
     .arrive-hint.over .cursor { animation: hint-blink 1s steps(1) 3, hint-out .6s ease 3s forwards; }
     @keyframes hint-out { to { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) {
-      .arrive-hint { animation: none; }
-      .arrive-hint .dot { animation: none; }
+      .arrive-hint, .arrive-hint.online, .arrive-chip.online { animation: none; transition: none; }
+      .arrive-hint .dot, .arrive-chip .dot { animation: none; }
       .arrive-hint .cursor { display: none; }
     }
   </style>
@@ -500,7 +527,7 @@
     (function () {
       var arrive = window.CITY_ARRIVE, canvas = document.getElementById('arrive-static');
       if (!arrive.static) canvas.remove();
-      if (!arrive.static && !arrive.hint) return;
+      if (!arrive.static && !arrive.msg) return;
 
       // the first scene in: now, or when the frame says so
       function firstScene(cb) {
@@ -514,8 +541,17 @@
         });
       }
 
-      if (!arrive.static) {   // reduced motion: no static, the hint a moment after the scene is in
-        firstScene(function () { setTimeout(hint, 1500); });
+      // the message's state, see hint() below
+      var READ_MS = 4500, msg = arrive.msg, state = 'none';   // none, typing, open, folded, gone
+      var box, lines, chip, cursor, timer;
+      // listening from the start: the first scene may already be the booth
+      window.addEventListener('message', function (e) {
+        if (e.data && e.data.type === 'city:scene' && e.data.file === 'booth.html') retire();
+      });
+      firstScene(watch);
+      if (!arrive.static) {
+        if (arrive.fresh) firstScene(function () { setTimeout(hint, 1500); });   // reduced motion: no static, the hint a moment after the scene is in
+        else if (arrive.msg) firstScene(function () { fold(); });   // back in the same tab: the message is waiting in its chip
         return;
       }
       var ctx = canvas.getContext('2d');
@@ -534,29 +570,32 @@
         canvas.style.opacity = '0';
         setTimeout(function () {
           done = true; canvas.remove(); document.documentElement.classList.remove('tune-in');
-          setTimeout(hint, 3000);
+          if (arrive.fresh) setTimeout(hint, 3000);
+          else if (arrive.msg) fold();
         }, 2100);
       }
       firstScene(function () { setTimeout(clear, 350); });
       setTimeout(clear, 6000);
 
       // the panel flickers on; then each line is typed a key at a time, unevenly, under a blinking block cursor,
-      // a pause between lines, and they all stay
-      function hint() {
-        if (!arrive.hint) return;
-        var box = document.createElement('div'), cursor = document.createElement('span');
+      // a short pause between lines. READ_MS after the last line (time to read it) it folds into a chip in its
+      // corner: a message waiting, "1" until it has been read. A click on the chip opens the whole message again,
+      // untyped; a click on it, Esc, or a click in the scene closes it. Leaving the first scene before the message
+      // is all in folds it at once, still unread. In the listening booth, where it leads, it has done its job.
+      function save() { try { sessionStorage.setItem('city-msg', JSON.stringify(msg)); } catch (_) {} }
+
+      function panel() {
+        box = document.createElement('div');
         box.className = 'arrive-hint';
         box.setAttribute('role', 'status');
-        if (arrive.head) {
+        if (msg.head) {
           var head = document.createElement('p'), dot = document.createElement('span');
           head.className = 'head';
           dot.className = 'dot';
-          head.append(dot, document.createTextNode(arrive.head));
+          head.append(dot, document.createTextNode(msg.head));
           box.append(head);
         }
-        cursor.className = 'cursor';
-        cursor.setAttribute('aria-hidden', 'true');
-        var lines = arrive.hint.split('|').map(function (t) {
+        lines = msg.hint.split('|').map(function (t) {
           var el = document.createElement('div');
           el.className = 'line';
           box.append(el);
@@ -566,41 +605,112 @@
         box.style.width = 'calc(' + (longest + 1) + 'ch + 4px)';
         box.style.fontFamily = '"JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace';   // so ch is the lines' ch
         box.style.fontSize = 'clamp(20px, 2.6vw, 32px)';
+        box.addEventListener('click', close);
+        box.addEventListener('animationend', function () { box.classList.remove('online'); });
         document.body.append(box);
-        var l = 0, i = 0, timer;
+      }
+      function whole() {
+        lines.forEach(function (line) { line.el.textContent = line.chars.join(''); line.el.style.display = ''; });
+      }
+
+      function hint() {
+        if (state !== 'none') return;
+        state = 'typing';
+        panel();
+        box.classList.add('online');
         if (arrive.still) {
-          lines.forEach(function (line) { line.el.textContent = line.chars.join(''); });
-          box.classList.add('over');
-        } else {
-          lines.forEach(function (line, n) { if (n) line.el.style.display = 'none'; });
-          lines[0].el.append(cursor);
-          timer = setTimeout(function type() {
-            var line = lines[l];
-            if (i < line.chars.length) {
-              cursor.before(line.chars[i++]);
-              timer = setTimeout(type, 55 + Math.random() * 110);
-            } else if (l < lines.length - 1) {
-              timer = setTimeout(function () {
-                l++; i = 0;
-                lines[l].el.style.display = '';
-                lines[l].el.append(cursor);
-                timer = setTimeout(type, 400);
-              }, 1100);
-            } else box.classList.add('over');
-          }, 700);
+          whole();
+          timer = setTimeout(function () { msg.read = true; fold(); }, READ_MS + 2000);
+          return;
         }
-        // gone once the reader leaves the first scene: as its transition video starts, or as another scene loads
-        function gone() {
-          if (box.classList.contains('gone')) return;
-          clearTimeout(timer);
-          box.classList.add('gone');
-          setTimeout(function () { box.remove(); }, 700);
+        var l = 0, i = 0;
+        cursor = document.createElement('span');
+        cursor.className = 'cursor';
+        cursor.setAttribute('aria-hidden', 'true');
+        lines.forEach(function (line, n) { if (n) line.el.style.display = 'none'; });
+        lines[0].el.append(cursor);
+        timer = setTimeout(function type() {
+          var line = lines[l];
+          if (i < line.chars.length) {
+            cursor.before(line.chars[i++]);
+            timer = setTimeout(type, 35 + Math.random() * 60);
+          } else if (l < lines.length - 1) {
+            timer = setTimeout(function () {
+              l++; i = 0;
+              lines[l].el.style.display = '';
+              lines[l].el.append(cursor);
+              timer = setTimeout(type, 250);
+            }, 600);
+          } else {
+            box.classList.add('over');
+            timer = setTimeout(function () { msg.read = true; fold(); }, READ_MS);
+          }
+        }, 700);
+      }
+
+      function fold() {
+        if (!msg || state === 'gone' || state === 'folded') return;
+        clearTimeout(timer);
+        if (!box) panel();
+        whole();
+        box.classList.remove('held', 'over');
+        box.classList.add('folded');
+        state = 'folded';
+        save();
+        if (!chip) {
+          chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'arrive-chip online';
+          chip.title = msg.head || 'Message';
+          chip.innerHTML = '<span class="dot" aria-hidden="true"></span><span class="count">1</span>';
+          chip.addEventListener('click', function () { if (state === 'open') close(); else open(); });
+          chip.addEventListener('animationend', function () { chip.classList.remove('online'); });
+          document.body.append(chip);
         }
-        var frame = document.getElementById('city-frame');
-        if (frame) frame.addEventListener('load', gone, { once: true });
-        window.addEventListener('message', function (e) {
-          if (e.data && e.data.type === 'city:transition') gone();
+        chip.classList.toggle('read', !!msg.read);
+        chip.setAttribute('aria-label', (msg.head || 'Message') + (msg.read ? '' : ', 1 unread'));
+        chip.setAttribute('aria-expanded', 'false');
+      }
+      function open() {
+        if (state !== 'folded') return;
+        state = 'open';
+        msg.read = true;
+        save();
+        box.classList.remove('folded');
+        box.classList.add('held');
+        chip.classList.add('read');
+        chip.setAttribute('aria-label', msg.head || 'Message');
+        chip.setAttribute('aria-expanded', 'true');
+      }
+      function close() {
+        if (state !== 'open') return;
+        state = 'typing';   // so fold() takes it
+        fold();
+      }
+      // the booth: what the message pointed at. The chip flickers off, and the message is gone for good.
+      function retire() {
+        if (state === 'gone') return;
+        clearTimeout(timer);
+        state = 'gone';
+        try { sessionStorage.removeItem('city-msg'); } catch (_) {}
+        [box, chip].forEach(function (el) {
+          if (!el) return;
+          el.classList.add('gone', 'folded');
+          setTimeout(function () { el.remove(); }, 700);
         });
+      }
+
+      // from the first scene on: leaving it folds the message, the booth retires it, Esc or a click in the scene
+      // (the shell loses focus to the frame) closes it when open
+      function watch() {
+        var frame = document.getElementById('city-frame');
+        if (frame) frame.addEventListener('load', function () { if (state === 'typing' || state === 'none') fold(); });
+        window.addEventListener('message', function (e) {
+          if (!e.data) return;
+          if (e.data.type === 'city:transition' && (state === 'typing' || state === 'none')) fold();
+        });
+        window.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+        window.addEventListener('blur', close);
       }
     })();
   </script>

@@ -3,7 +3,8 @@
 // stairs, at the booth door), twitching an ear now and then. Not clickable: the scene's own hotspots work as before.
 // It isn't there when a scene opens: the visitor looks around first. After APPEAR_DELAY it fades in like a
 // hologram switching on, a hint for whoever lingers. Once the booth has been found (booth.html sets
-// city-rabbit-done in localStorage), it has done its job and appears no more.
+// city-rabbit-done in localStorage), it has done its job and appears no more, unless a message from Longplay
+// says to follow it (the shell sets city-rabbit-call for the tab): then it is back, and sooner, until the booth.
 // (It used to hop in to its spot; the run is in git history, f2ba95d.)
 // A scene sets window.CITY_RABBIT before loading this:
 //   { at: [x, y, scale], facing: 1 }
@@ -11,8 +12,10 @@
 (function () {
   var cfg = window.CITY_RABBIT, scene = document.querySelector('.scene');
   if (!cfg || !scene || !cfg.at) return;
-  try { if (localStorage.getItem('city-rabbit-done') === '1') return; } catch (_) {}
-  var APPEAR_DELAY = 5000;
+  var called = false;
+  try { called = sessionStorage.getItem('city-rabbit-call') === '1'; } catch (_) {}
+  try { if (!called && localStorage.getItem('city-rabbit-done') === '1') return; } catch (_) {}
+  var APPEAR_DELAY = called ? 2500 : 5000;
   var NS = 'http://www.w3.org/2000/svg';
   var still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 

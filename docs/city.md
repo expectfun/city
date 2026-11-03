@@ -150,6 +150,14 @@ what you recognise from where you've been. When a way isn't obvious, fix the pic
 - White rabbit (`js/rabbit.js`): a trail from the street to the booth (street → library → stairs → booth door).
   It isn't there when a scene opens; after 5 s it fades in like a hologram switching on, a hint for whoever
   lingers. Once the booth has been found it appears no more (`city-rabbit-done` in `localStorage`).
+  Arriving with the Longplay message brings it back for that tab, after 2.5 s instead of 5
+  (`city-rabbit-call` in `sessionStorage`), until the booth.
+- The Longplay message (red pill → the City): it comes in on the HUD ~3 s after the static clears, typed
+  (~15 keys/s), stays 4.5 s once complete, then folds into a chip in its corner: "1" while unread, a quiet dot
+  once read. Click the chip to open the whole message again; click it, Esc or a click in the scene closes it.
+  Leaving the first scene before it's all in folds it at once, unread. The chip goes along from scene to scene
+  and survives a reload (`city-msg` in `sessionStorage`); reaching the booth retires it. The text itself is
+  the pill's `data-hint` / `data-hint-head` in the Longplay posts.
 - Booth: nothing is labelled. The door, the crates and the terminal (its screen already says
   "READ ▸") explain themselves; an empty turntable opens the crates. Two cues remain where a click
   does something you can't guess: on hover over the turntable once a record is on, "▶ PLAY" /
